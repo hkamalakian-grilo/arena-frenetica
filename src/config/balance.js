@@ -25,12 +25,12 @@ M.BAL = {
   xp: {
     shareRadius: 400,                    // raio de compartilhamento (§8)
     minion: { melee: 25, ranged: 35 },   // XP por minion
-    heroKill: 70, heroAssist: 35, assistWindow: 5,
+    heroKill: 55, heroAssist: 28, assistWindow: 5,
     towerTeam: 60,                       // XP para CADA herói do time (§8)
-    thresholds: [0, 80, 190, 330, 520],  // XP acumulado p/ nível 1..5
+    thresholds: [0, 95, 230, 400, 620],  // XP acumulado p/ nível 1..5
     // Multiplicador por mapa (§6): Mapa B tem farm solo por lane,
     // então rende mais XP por herói — calibrado p/ nível 4 em ~1:20–1:40 nos dois
-    mapMult: { A: 1.0, B: 0.65 },
+    mapMult: { A: 1.0, B: 0.62 },
   },
 
   levelBonus: { hp: 0.08, dmg: 0.06 },   // por nível (§8), sem cura no level up
@@ -57,7 +57,7 @@ M.BAL = {
     range: 220, period: 1.0, radius: 28, projSpeed: 900,
     rampPct: 0.25, rampMax: 4,   // +25%/tiro consecutivo vs herói (§5), cap
     // HP/dano por tipo (§5)
-    A: { t1: { hp: 1200, dmg: 90 }, t2: { hp: 1500, dmg: 110 } },
+    A: { t1: { hp: 1150, dmg: 90 }, t2: { hp: 1250, dmg: 110 } },
     B: { lane: { hp: 1300, dmg: 100 } },
   },
 
@@ -69,9 +69,9 @@ M.BAL = {
 
   dragon: {
     spawnAt: 120, warnBefore: 10,        // spawna aos 2:00 (§9)
-    hp: 1800, dmg: 100, period: 1.0, range: 200, radius: 26,
+    hp: 1400, dmg: 100, period: 1.0, range: 200, radius: 26,
     leash: 135, resetAfter: 4,           // não sai do pit; reseta em 4s (§9)
-    buffDuration: 45, buffDmgPct: 0.25, buffWaves: 2,  // recompensa (§9)
+    buffDuration: 45, buffDmgPct: 0.3, buffWaves: 2,   // recompensa (§9)
   },
 
   bush: { revealOnAction: 1.5 },         // atacar/castar revela por 1,5s (§4)
@@ -116,7 +116,7 @@ M.BAL = {
     retreatHpPct: 0.30, retreatExitHpPct: 0.50,
     allinTargetHpPct: 0.35, allinMinSelfHpPct: 0.35,
     pokeMinHpPct: 0.50, pokeSightRange: 520,
-    objectiveMinHpPct: 0.50,
+    objectiveMinHpPct: 0.45,
     chaseRange: 560,
     diveMinHpPct: 0.60,        // não tanka torre abaixo disso sem minions
     towerHoldDist: 265,        // distância segura de torre inimiga

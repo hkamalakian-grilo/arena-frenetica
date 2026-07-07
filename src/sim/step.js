@@ -739,12 +739,12 @@ function step(st, playerCmd) {
   updateDragon(st);
   M.abilities.resolvePending(st, DT);
 
-  for (const h of st.heroes) {
-    let cmd;
-    if (h.isBot) cmd = M.bots.think(st, h);
-    else cmd = playerCmd || { move: { x: 0, y: 0 }, aaHeld: false, cast: null };
-    updateHero(st, h, cmd);
-  }
+  // comandos de TODOS amostrados antes de mover qualquer herói — sem
+  // vantagem de informação p/ quem age depois (e pronto p/ multiplayer)
+  const cmds = st.heroes.map(h => h.isBot
+    ? M.bots.think(st, h)
+    : (playerCmd || { move: { x: 0, y: 0 }, aaHeld: false, cast: null }));
+  for (let i = 0; i < st.heroes.length; i++) updateHero(st, st.heroes[i], cmds[i]);
 
   for (const m of st.minions) if (m.alive) updateMinion(st, m);
   separateMinions(st);

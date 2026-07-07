@@ -1,0 +1,66 @@
+# DECISIONS — decisões de design não especificadas (§17)
+
+Cada linha: a decisão e a justificativa em uma linha.
+
+## Desvio de stack (aprovado pelo usuário)
+
+- **JavaScript puro em vez de TypeScript + Vite**: a máquina não tem Node e a instalação exigia
+  admin; o usuário optou por "sem Node". O jogo abre com 2 cliques no `index.html` (scripts
+  clássicos funcionam em `file://`). A estrutura de pastas, a separação sim/render e o timestep
+  fixo da spec foram mantidos integralmente; o namespace global `MOBA` substitui os imports.
+- **Simulação testável sem browser**: mantida — `src/sim/` não toca DOM (verificado por busca);
+  o runner headless (`src/sim/headless.js`) roda as suítes de playtest na própria página ou em
+  qualquer engine JS; em Node bastaria concatenar/`require` os arquivos de `sim/` + `config/`.
+
+## Simulação / regras
+
+- **Comandos amostrados antes de qualquer update de herói**: elimina vantagem de informação para
+  quem age depois no tick (bug de simetria encontrado no playtest) e espelha o modelo de servidor
+  autoritativo futuro.
+- **Habilidades não acertam estruturas**: padrão do gênero; torres caem por AA (+ minions
+  tankando), mantendo o papel dos minions (§6).
+- **Dragão imune a stun/slow**: chefe neutro; CC nele deixaria o leash/reset inconsistente.
+- **Cura do Sol não escala com nível**: §8 dá +6% a DANO; curas ficam fixas para o suporte não
+  virar bola de neve.
+- **Orbe Solar**: colide com heróis/minions/dragão inimigos (dano) e com HERÓIS aliados feridos
+  (cura); aliado com HP cheio não bloqueia o projétil, senão a Q "desperdiçaria" no tank full.
+- **Velocidade de ataque** (não especificada): Brutus 0,9s, Lyra 0,8s, Nix 0,7s, Sol 0,9s por
+  ataque — calibradas p/ TTK 4–6s em trade justo (§7) considerando os HPs dados.
+- **Respawn cura 100%**: padrão do gênero; o "cura completa NÃO" do §8 refere-se ao level up
+  (implementado: só o delta de HP máximo é somado).
+- **XP de minion dividido igualmente** entre aliados no raio de 400u; se nenhum herói está no
+  raio, o XP se perde (punir farm ausente). Kill 55 / assist 28 (janela de 5s) / torre 60 p/ cada
+  herói do time.
+- **Ramp da torre com teto de +100%** (4 stacks): dive continua punido sem one-shot instantâneo.
+- **Pit do dragão NA lane do Mapa A**: consequência literal do §4 (pit no centro exato + lane
+  única passando pela arena central); o efeito colateral (dragão no meio do fluxo) está medido e
+  discutido no BALANCE_NOTES.
+- **Minions podem ser atordoados** (Investida); dragão não.
+- **Empate absoluto aceito** (§10): implementado e sinalizado na tela de resultado; não ocorreu
+  em ~120 partidas de bots.
+
+## Apresentação / controles
+
+- **Hitstop congela a simulação, não o render** (40ms): partículas e HUD continuam vivos, o
+  impacto "morde" sem a tela travar.
+- **Números de dano só em heróis/estruturas/dragão**; minions recebem faísca — 30+ floats de
+  dano de minion por wave viravam ruído.
+- **Menu e resultado desenhados no próprio canvas**: um único caminho de render, zero DOM extra,
+  e o rematch nunca recarrega a página (§15).
+- **Escala de UI limitada em desktop** (`uiScale ≤ 1,15`): os botões touch dimensionados p/ 64px
+  móveis ficavam gigantes em monitor.
+- **Retrato (celular em pé)**: overlay "gire o celular" e simulação pausada — o jogo é landscape
+  por decisão fechada da spec (§2).
+- **Aliado escolhido automaticamente** (Sol para qualquer pick; Lyra se o jogador pegar Sol) e
+  dupla inimiga sorteada: tela de seleção enxuta (§3); duplas inimigas podem repetir heróis do
+  time azul, nunca dentro do próprio time.
+- **Sem áudio na v1**: explicitamente opcional na spec (§3); a arquitetura de eventos já emite
+  tudo que um futuro `audio.js` precisaria consumir.
+- **`navigator.vibrate`** só em abate/morte do jogador (suporte varia; falha silenciosa).
+
+## Processo
+
+- **Playtest do M5 via bots** (ver metodologia no BALANCE_NOTES): sem humano disponível no
+  ambiente; as suítes são reproduzíveis por seed e rodáveis no console (`__moba.runSuite`).
+- **Servidor local (`python -m http.server`) usado apenas durante o desenvolvimento** para as
+  ferramentas de inspeção; o jogo em si não precisa de servidor.

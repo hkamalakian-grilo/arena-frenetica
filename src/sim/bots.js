@@ -185,7 +185,9 @@ function decide(st, h) {
     if (s) {
       mind.moveTo = { x: s.pos.x, y: s.pos.y };
       // dive safety: sem minions tankando e HP baixo → segura fora do alcance
-      if (s.kind === 'tower' && alliedMinionsNearTower(st, h.team, s) === 0 && myPct < B.diveMinHpPct) {
+      // (com o buff do dragão, comita: a janela de 45s não pode ser desperdiçada §9)
+      if (s.kind === 'tower' && st.dragonBuffT[h.team] <= 0 &&
+          alliedMinionsNearTower(st, h.team, s) === 0 && myPct < B.diveMinHpPct) {
         const back = V.towards(s.pos, ownBase);
         mind.moveTo = { x: s.pos.x + back.x * B.towerHoldDist, y: s.pos.y + back.y * B.towerHoldDist };
       }
