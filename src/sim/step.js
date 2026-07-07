@@ -487,10 +487,10 @@ function updateTower(st, tw) {
   if (tgt && tw.aaCd <= 0) {
     tw.aaCd = R.period;
     let dmg = tw.dmg;
-    if (tgt.kind === 'hero') {   // ramp anti-dive (§5)
-      if (tw.rampTargetId === tgt.id) tw.rampStacks = Math.min(tw.rampStacks + 1, R.rampMax);
-      else { tw.rampTargetId = tgt.id; tw.rampStacks = 0; }
+    if (tgt.kind === 'hero') {   // ramp anti-dive (§5): 1º tiro base, depois +25%/tiro
+      if (tw.rampTargetId !== tgt.id) { tw.rampTargetId = tgt.id; tw.rampStacks = 0; }
       dmg = Math.round(dmg * (1 + R.rampPct * tw.rampStacks));
+      tw.rampStacks = Math.min(tw.rampStacks + 1, R.rampMax);
     } else { tw.rampStacks = 0; tw.rampTargetId = -1; }
     st.projectiles.push({
       id: st.nextId++, ptype: 'tower', team: tw.team, srcId: -1,
