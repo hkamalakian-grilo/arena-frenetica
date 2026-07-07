@@ -160,12 +160,12 @@ function resolvePending(st, dt) {
     } else if (p.type === 'lyraR') {
       const A = M.BAL.heroes.lyra.r;
       st.zones.push({ id: st.nextId++, ztype: 'lyraR', pos: p.pos, radius: p.radius,
-                      team: p.team, srcId: p.srcId, tLeft: A.dur, tickT: 0 });
+                      team: p.team, srcId: p.srcId, tLeft: A.dur, tickT: A.tick });
       st.events.push({ type: 'zoneStart', pos: { ...p.pos }, radius: p.radius, kind: 'lyraR' });
     } else if (p.type === 'solR') {
       const A = M.BAL.heroes.sol.r;
       st.zones.push({ id: st.nextId++, ztype: 'solR', pos: p.pos, radius: p.radius,
-                      team: p.team, srcId: p.srcId, tLeft: A.dur, tickT: 0 });
+                      team: p.team, srcId: p.srcId, tLeft: A.dur, tickT: A.tick });
       st.events.push({ type: 'zoneStart', pos: { ...p.pos }, radius: p.radius, kind: 'solR' });
     }
   }
