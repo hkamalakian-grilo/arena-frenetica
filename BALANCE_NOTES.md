@@ -37,13 +37,13 @@ Também corrigidos durante o playtest (mecânica, não número): ramp da torre a
 
 | Métrica | Mapa A — Coliseu | Mapa B — Encruzilhada |
 |---|---|---|
-| Duração média | **3:14** | **2:56** |
-| Abates por partida (total) | 27,6 | 31,7 |
-| % indo a morte súbita | 50% | **8%** |
+| Duração média | **3:13** | **2:57** |
+| Abates por partida (total) | 27,8 | 31,6 |
+| % indo a morte súbita | 42% | **8%** |
 | Dragão morto / contestado | 42% / 67% | **92% / 100%** |
 | Nível 4 (média) | 1:13 | **1:21** |
 | Vitórias do azul | 50% | 58% |
-| Desfechos | 2 base, 4 torres, 5 SD, 1 HP% | 6 base, 5 torres, 1 SD |
+| Desfechos | 2 base, 5 torres, 4 SD, 1 HP% | 5 base, 6 torres, 1 SD |
 | Empates / travadas | 0 / 0 | 0 / 0 |
 
 ## Recomendação: **Mapa B (Encruzilhada) como layout principal**

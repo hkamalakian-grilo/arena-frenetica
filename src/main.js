@@ -132,8 +132,8 @@ globalThis.__moba = {
       M.step(APP.st, cmd || M.controls.getCommand(APP.st, player));
       M.fx.ingest(APP.st, APP.st.events);
       APP.st.events.length = 0;
+      M.fx.update(1 / 60, APP.st);   // envelhece efeitos tick a tick, como no loop real
     }
-    M.fx.update(Math.min(0.4, n / 60), APP.st);
     M.renderer.render(APP.st, 1, { playerTeam: 0, aimPreview: M.controls.aimPreview, fps: 0 });
     return { time: +APP.st.time.toFixed(2), phase: APP.st.phase };
   },

@@ -28,6 +28,9 @@ function reset(playerTeam) {
 
 function rnd(a, b) { return a + Math.random() * (b - a); }
 
+// tetos de segurança p/ teamfights pesados (descarta os mais antigos)
+const MAX_PARTICLES = 700, MAX_FLOATERS = 80;
+
 function burst(x, y, n, color, speed, size, tMax, shape) {
   for (let i = 0; i < n; i++) {
     const a = rnd(0, Math.PI * 2), s = rnd(speed * 0.3, speed);
@@ -35,6 +38,7 @@ function burst(x, y, n, color, speed, size, tMax, shape) {
       t: 0, tMax: rnd(tMax * 0.6, tMax), size: rnd(size * 0.6, size),
       color, shape: shape || 'dot', drag: 0.9 });
   }
+  if (FX.particles.length > MAX_PARTICLES) FX.particles.splice(0, FX.particles.length - MAX_PARTICLES);
 }
 
 function ring(x, y, radius, color, tMax) {
@@ -44,6 +48,7 @@ function ring(x, y, radius, color, tMax) {
 function floater(x, y, text, color, big) {
   FX.floaters.push({ x: x + rnd(-12, 12), y: y - 20, vy: -52, t: 0,
     tMax: M.BAL.fx.dmgFloatT, text, color, size: big ? 22 : 15 });
+  if (FX.floaters.length > MAX_FLOATERS) FX.floaters.splice(0, FX.floaters.length - MAX_FLOATERS);
 }
 
 function banner(text, color) {
