@@ -275,13 +275,33 @@ function updateHero(st, h, cmd) {
 
   if (h.dash) return;   // cast pode ter iniciado dash
 
-  // movimento
+  // movimento (com deslize de quina: bater de frente numa parede não trava —
+  // contorna pela quina mais próxima; feedback do playtest humano no Mapa B)
   const mv = V.clampLen(cmd.move.x, cmd.move.y, 1);
   const spd = cfg.speed * (h.slowT > 0 ? 1 - h.slowPct : 1);
   if (mv.x || mv.y) {
+    const bx = h.pos.x, by = h.pos.y;
     h.pos.x += mv.x * spd * DT;
     h.pos.y += mv.y * spd * DT;
     geo.collideWorld(st.map, h.pos, h.radius);
+    const want = spd * DT * V.len(mv.x, mv.y);
+    if (V.len(h.pos.x - bx, h.pos.y - by) < want * 0.35) {
+      const probe = { x: bx + mv.x * (spd * DT + h.radius), y: by + mv.y * (spd * DT + h.radius) };
+      for (const w of st.map.walls) {
+        if (geo.pointInRect(probe, w, h.radius * 0.7)) {
+          let tx = 0, ty = 0;
+          if (Math.abs(mv.x) >= Math.abs(mv.y)) {
+            ty = (by - w.y) < (w.y + w.h - by) ? -1 : 1;   // quina mais próxima
+          } else {
+            tx = (bx - w.x) < (w.x + w.w - bx) ? -1 : 1;
+          }
+          h.pos.x = bx + tx * spd * DT;
+          h.pos.y = by + ty * spd * DT;
+          geo.collideWorld(st.map, h.pos, h.radius);
+          break;
+        }
+      }
+    }
     if (V.len(mv.x, mv.y) > 0.15) h.facing = V.norm(mv.x, mv.y);
   }
 

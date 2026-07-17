@@ -52,6 +52,22 @@ Nota honesta sobre o item 16: o winrate é medido em partidas de BOTS, que subva
 (a Sol humana cura um jogador que se posiciona; a Sol bot desperdiça orbe). Não vale afinar
 paridade além disso sem playtest humano.
 
+## Rodada 3 — redesenho do Mapa B ("ficou ruim a movimentação")
+
+O usuário reportou que os dois blocões entre as lanes travavam a movimentação — pediu uma
+SELVA com paredes pequenas. Mudanças:
+
+| # | Mudança | Detalhe | Por quê |
+|---|---|---|---|
+| 17 | Selva no Mapa B | 2 blocões (425×300) → 6 rochas pequenas (~120×60) em simetria de ponto, com corredores ≥90u; 2 bushes de emboscada novos nos bolsões (total 6 bushes no B) | Todo o miolo virou área jogável com caminhos sinuosos; o conector segue sendo a estrada principal do pit. |
+| 18 | Deslize de quina (movimento) | Bater de frente numa parede não trava mais: o herói contorna pela quina mais próxima | Andar reto contra rocha parava o personagem no lugar — pior sensação de movimento do playtest. |
+| 19 | IA: recuo até a FONTE | RETREAT ia p/ "atrás da torre" (lógica pré-fonte) e o bot ficava parado sem regenerar | Com a fonte, recuar de verdade = voltar à base, curar em ~3s e voltar. Bots "AFK" caíram de 98s p/ 3s por partida. |
+
+Resultado no B pós-selva (24 partidas): morte súbita **17%** (melhor que os 25–31% dos blocões),
+dragão morto em 92%, duração 3:05, zero travadas. Nota: o nível 4 medido em bots subiu p/ ~1:41
+porque eles roamam mais e farmam menos na selva — humano que farma lane sobe no ritmo alvo; por
+isso o `mapMult.B` ficou em 0,65 (calibrado p/ farm de lane, não p/ o roaming dos bots).
+
 ### Estado após a rodada 2 (12–36 partidas por medição, seeds novas)
 
 | Métrica | Mapa A | Mapa B |

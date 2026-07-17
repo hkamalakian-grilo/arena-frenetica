@@ -30,7 +30,7 @@ M.BAL = {
     thresholds: [0, 105, 250, 440, 680], // XP acumulado p/ nível 1..5
     // Multiplicador por mapa (§6): Mapa B tem farm solo por lane,
     // então rende mais XP por herói — calibrado p/ nível 4 em ~1:20–1:40 nos dois
-    mapMult: { A: 1.0, B: 0.62 },
+    mapMult: { A: 1.0, B: 0.65 },
   },
 
   levelBonus: { hp: 0.08, dmg: 0.06 },   // por nível (§8), sem cura no level up

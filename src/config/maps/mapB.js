@@ -1,8 +1,11 @@
 /**
  * Mapa B — "Encruzilhada" (§4): duas lanes paralelas com 1 torre por lane
- * por lado, conector central vertical passando pelo pit do dragão,
- * 4 bushes (2 nas bocas do conector, 2 nos cantos externos espelhados).
- * Gating: base atacável com ≥1 torre caída (default) ou 2 (flag em balance.js).
+ * por lado e uma SELVA entre as lanes (redesenho do playtest humano: pedras
+ * pequenas criando caminhos sinuosos em vez de dois blocões intransitáveis).
+ * O conector central continua sendo a estrada principal, passando pelo pit.
+ * Bushes: 2 nas bocas do conector, 2 nos cantos externos (§4-B) + 2 de
+ * emboscada nos bolsões da selva (espelhados). Gating: base atacável com
+ * ≥1 torre caída (default) ou 2 (flag em balance.js).
  */
 (function () {
 'use strict';
@@ -12,7 +15,7 @@ M.MAPS = M.MAPS || {};
 M.MAPS.B = {
   id: 'B',
   name: 'Encruzilhada',
-  desc: 'Duas lanes + conector central. Rotação é mind game.',
+  desc: 'Duas lanes + selva central. Rotação é mind game.',
   size: { w: 1600, h: 900 },
 
   bases: [ { x: 80, y: 450 }, { x: 1520, y: 450 } ],
@@ -46,20 +49,27 @@ M.MAPS.B = {
     { lane: 1, teamPos: [ { x: 140, y: 480 }, { x: 1460, y: 480 } ] },
   ],
 
-  // Dois blocões entre as lanes; conector central x∈[715,885] aberto;
-  // regiões das bases (x<290 e x>1310) abertas ligando as duas lanes
+  // SELVA entre as lanes: 6 rochas pequenas (3 por lado, simetria de ponto)
+  // criando corredores sinuosos de ≥90u; todo o miolo é transitável.
+  // Duas rochas emolduram o pit (bolsões de luta no dragão).
   walls: [
-    { x: 290, y: 300, w: 425, h: 300 },
-    { x: 885, y: 300, w: 425, h: 300 },
+    { x: 400,  y: 330, w: 120, h: 60 },   // selva esq. — rocha norte
+    { x: 400,  y: 510, w: 120, h: 60 },   // selva esq. — rocha sul
+    { x: 610,  y: 420, w: 90,  h: 60 },   // moldura oeste do pit
+    { x: 1080, y: 510, w: 120, h: 60 },   // selva dir. — rocha sul (espelho)
+    { x: 1080, y: 330, w: 120, h: 60 },   // selva dir. — rocha norte (espelho)
+    { x: 900,  y: 420, w: 90,  h: 60 },   // moldura leste do pit (espelho)
   ],
 
-  // 4 bushes: 2 nas bocas do conector (saídas p/ as lanes) e
-  // 2 nos cantos externos das lanes, espelhados (§4-B)
+  // 4 bushes do §4-B (bocas do conector + cantos externos espelhados)
+  // + 2 bushes de EMBOSCADA nos bolsões da selva (decisão do playtest humano)
   bushes: [
-    { x: 730, y: 212, w: 140, h: 84 },   // boca norte do conector
-    { x: 730, y: 604, w: 140, h: 84 },   // boca sul do conector
-    { x: 300, y: 52,  w: 170, h: 90 },   // canto externo — lane sup., lado azul
-    { x: 1130, y: 758, w: 170, h: 90 },  // canto externo — lane inf., lado vermelho
+    { x: 730,  y: 212, w: 140, h: 84 },   // boca norte do conector
+    { x: 730,  y: 604, w: 140, h: 84 },   // boca sul do conector
+    { x: 300,  y: 52,  w: 170, h: 90 },   // canto externo — lane sup., lado azul
+    { x: 1130, y: 758, w: 170, h: 90 },   // canto externo — lane inf., lado vermelho
+    { x: 400,  y: 412, w: 120, h: 76 },   // bolsão da selva esquerda
+    { x: 1080, y: 412, w: 120, h: 76 },   // bolsão da selva direita (espelho)
   ],
 
   dragonPit: { x: 800, y: 450, radius: 100 },

@@ -126,13 +126,8 @@ function decide(st, h) {
   const retreating = mind.state === 'RETREAT' ? myPct < B.retreatExitHpPct : myPct < B.retreatHpPct;
   if (retreating) {
     mind.state = 'RETREAT';
+    // recua até a FONTE (cura 8%/s) — atrás da torre não regenera nada
     let goal = { x: ownBase.x, y: ownBase.y };
-    const myTowers = st.towers.filter(t => t.team === h.team && t.alive);
-    const tw = nearest(h.pos, myTowers);
-    if (tw) {
-      const behind = V.towards(tw.pos, ownBase);
-      goal = { x: tw.pos.x + behind.x * 120, y: tw.pos.y + behind.y * 120 };
-    }
     // quebra visão por bush no caminho
     if (h.bushIdx < 0) {
       const toHome = V.towards(h.pos, goal);

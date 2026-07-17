@@ -39,6 +39,10 @@ Cada linha: a decisão e a justificativa em uma linha.
 - **Fonte de cura na base** (adição fora da spec, a pedido do playtest humano): 8%/s do HP máximo
   num raio de 110u da própria base, em pulsos de 0,5s — recuar vira decisão tática e dive na
   fonte é punido pela torre + regeneração do defensor.
+- **Mapa B com selva** (redesenho a pedido do playtest humano): os 2 blocões entre as lanes
+  viraram 6 rochas pequenas em simetria de ponto com corredores ≥90u + 2 bushes de emboscada nos
+  bolsões (o §4-B pede 4 bushes; os 4 originais foram mantidos e os 2 extras estão documentados
+  como desvio consciente). Movimento ganhou deslize de quina; bots recuam até a fonte.
 - **Empate absoluto aceito** (§10): implementado e sinalizado na tela de resultado; não ocorreu
   em ~120 partidas de bots.
 
