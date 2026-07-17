@@ -36,6 +36,9 @@ Cada linha: a decisão e a justificativa em uma linha.
   única passando pela arena central); o efeito colateral (dragão no meio do fluxo) está medido e
   discutido no BALANCE_NOTES.
 - **Minions podem ser atordoados** (Investida); dragão não.
+- **Fonte de cura na base** (adição fora da spec, a pedido do playtest humano): 8%/s do HP máximo
+  num raio de 110u da própria base, em pulsos de 0,5s — recuar vira decisão tática e dive na
+  fonte é punido pela torre + regeneração do defensor.
 - **Empate absoluto aceito** (§10): implementado e sinalizado na tela de resultado; não ocorreu
   em ~120 partidas de bots.
 

@@ -33,6 +33,35 @@ Alvos perseguidos (da spec):
 Também corrigidos durante o playtest (mecânica, não número): ramp da torre aplicava +25% já no
 1º tiro (agora 1º tiro é dano base); Chuva de Flechas dava 1 tick a mais (210 vs 180 de dano).
 
+## Rodada 2 — feedback de playtest HUMANO
+
+O usuário jogou e reportou: vida não cura na base; ataque básico lento; torres fracas — um
+inimigo de nível 1 o matou embaixo da própria torre e saiu vivo. Mudanças:
+
+| # | Mudança | De → Para | Por quê |
+|---|---|---|---|
+| 10 | **Fonte** (novo) | — → cura 8%/s do HP máx num raio de 110u da própria base | Não existia regeneração na base. Agora recuar cura rápido — e mergulhar em quem está na fonte é suicídio. |
+| 11 | Cadência de AA | 0,9/0,8/0,7/0,9s → 0,78/0,75/0,62/0,8s (Brutus/Lyra/Nix/Sol) | "Ataque básico um pouco lento" — DPS e responsividade subiram p/ todos. |
+| 12 | Velocidade de projéteis de AA | Lyra 800, Sol 740, torre 900 → 950/880/1000 | Metade da sensação de lentidão era o projétil viajando devagar. |
+| 13 | Dano das torres | A 90/110, B 100 → **A 125/150, B 135** | O cenário reportado reproduzido em teste: com os valores antigos o mergulhador sobrevivia. Com os novos, morre em ~3,5s sob a torre (tiros 150→188→225→263), com a torre trocando p/ o agressor em 0,02s. |
+| 14 | HP das torres | A 1150/1250, B 1300 → A 1050/1150, B 1150 | Compensação: só subir o dano travou os cercos (morte súbita no B foi de 8%→42%); com menos HP a torre continua letal contra dive mas cai p/ wave + herói. |
+| 15 | Curva de XP | thresholds [0,95,230,400,620] → [0,105,250,440,680]; kill/assist 55/28 → 45/22 | O AA mais rápido acelerou farm e abates; nível 4 tinha caído p/ ~64s. Voltou p/ ~83s (A) / ~90s (B). |
+| 16 | Paridade de heróis | Lyra AA 75→72 e alcance 320→305; Sol AA 55→62 e cura do Orbe 120→140; Nix AA 85→90; Brutus HP 1100→1150 | Com AA rápido, a Lyra (alcance + DPS sustentado) dominou (~70–80% de vitórias nas amostras); Sol ficou p/ trás. Após ajuste (48 partidas): Lyra 67%, Brutus 54%, Nix 48%, Sol 34%. |
+
+Nota honesta sobre o item 16: o winrate é medido em partidas de BOTS, que subvalorizam suporte
+(a Sol humana cura um jogador que se posiciona; a Sol bot desperdiça orbe). Não vale afinar
+paridade além disso sem playtest humano.
+
+### Estado após a rodada 2 (12–36 partidas por medição, seeds novas)
+
+| Métrica | Mapa A | Mapa B |
+|---|---|---|
+| Duração média | 3:04 | 3:06 |
+| Morte súbita | ~33% | ~31% (36 partidas) |
+| Dragão morto / contestado | 83% / 100% | 56% / 100% |
+| Nível 4 | ~1:23 | ~1:29–1:35 |
+| Timeouts / travadas | 0 | 0 |
+
 ## Comparativo final entre mapas (12 partidas novas por mapa, config final)
 
 | Métrica | Mapa A — Coliseu | Mapa B — Encruzilhada |

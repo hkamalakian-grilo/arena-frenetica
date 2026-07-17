@@ -25,9 +25,9 @@ M.BAL = {
   xp: {
     shareRadius: 400,                    // raio de compartilhamento (§8)
     minion: { melee: 25, ranged: 35 },   // XP por minion
-    heroKill: 55, heroAssist: 28, assistWindow: 5,
+    heroKill: 45, heroAssist: 22, assistWindow: 5,
     towerTeam: 60,                       // XP para CADA herói do time (§8)
-    thresholds: [0, 95, 230, 400, 620],  // XP acumulado p/ nível 1..5
+    thresholds: [0, 105, 250, 440, 680], // XP acumulado p/ nível 1..5
     // Multiplicador por mapa (§6): Mapa B tem farm solo por lane,
     // então rende mais XP por herói — calibrado p/ nível 4 em ~1:20–1:40 nos dois
     mapMult: { A: 1.0, B: 0.62 },
@@ -54,14 +54,20 @@ M.BAL = {
   },
 
   tower: {
-    range: 220, period: 1.0, radius: 28, projSpeed: 900,
+    range: 220, period: 1.0, radius: 28, projSpeed: 1000,
     rampPct: 0.25, rampMax: 4,   // +25%/tiro consecutivo vs herói (§5), cap
-    // HP/dano por tipo (§5)
-    A: { t1: { hp: 1150, dmg: 90 }, t2: { hp: 1250, dmg: 110 } },
-    B: { lane: { hp: 1300, dmg: 100 } },
+    // HP/dano por tipo (§5) — dano subido forte no playtest humano (dive de
+    // nível 1 embaixo de torre tem que ser quase suicídio) e HP reduzido na
+    // mesma medida p/ o cerco COM minions continuar fechando partidas
+    A: { t1: { hp: 1050, dmg: 125 }, t2: { hp: 1150, dmg: 150 } },
+    B: { lane: { hp: 1150, dmg: 135 } },
   },
 
   base: { hp: 2000, radius: 44 },
+
+  // Fonte: cura rápida perto da PRÓPRIA base (playtest humano: "vida não
+  // cura na base"). 8%/s do HP máx, em pulsos de 0,5s.
+  fountain: { radius: 110, healPctPs: 0.08, tick: 0.5 },
 
   // Gating do Mapa B (§4): default = base atacável com UMA torre caída;
   // true = exige as duas torres (flag para playtest)
@@ -80,15 +86,15 @@ M.BAL = {
   heroes: {
     brutus: {
       name: 'Brutus', role: 'Tanque', shape: 'hex', color: '#e8a33d',
-      hp: 1100, speed: 260, radius: 21,
-      aa: { dmg: 60, range: 90, period: 0.9 },
+      hp: 1150, speed: 260, radius: 21,
+      aa: { dmg: 60, range: 90, period: 0.78 },
       q: { name: 'Investida', cd: 7, dmg: 80, dashLen: 350, dashSpeed: 1150, stun: 0.8 },
       r: { name: 'Terremoto', cd: 45, dmg: 200, radius: 250, slowPct: 0.4, slowDur: 2, tele: 0.4 },
     },
     lyra: {
       name: 'Lyra', role: 'Atiradora', shape: 'diamond', color: '#7ee08a',
       hp: 750, speed: 270, radius: 18,
-      aa: { dmg: 75, range: 320, period: 0.8, projSpeed: 800 },
+      aa: { dmg: 72, range: 305, period: 0.75, projSpeed: 950 },
       q: { name: 'Flecha Perfurante', cd: 6, dmg: 120, range: 600, width: 22, projSpeed: 980 },
       r: { name: 'Chuva de Flechas', cd: 40, dps: 60, dur: 3, radius: 200, castRange: 500,
            slowPct: 0.25, tele: 0.55, tick: 0.5 },
@@ -96,15 +102,15 @@ M.BAL = {
     nix: {
       name: 'Nix', role: 'Assassino', shape: 'tri', color: '#b07ce8',
       hp: 800, speed: 300, radius: 18,
-      aa: { dmg: 85, range: 100, period: 0.7 },
+      aa: { dmg: 90, range: 100, period: 0.62 },
       q: { name: 'Passo Sombrio', cd: 8, blinkLen: 300, bonusDmg: 100, bonusWindow: 3 },
       r: { name: 'Execução', cd: 50, dmg: 280, execHpPct: 0.35, range: 450, dashSpeed: 1400 },
     },
     sol: {
       name: 'Sol', role: 'Suporte', shape: 'circle', color: '#ffd166',
       hp: 700, speed: 265, radius: 18,
-      aa: { dmg: 55, range: 300, period: 0.9, projSpeed: 740 },
-      q: { name: 'Orbe Solar', cd: 7, dmg: 100, heal: 120, range: 560, width: 22, projSpeed: 840 },
+      aa: { dmg: 62, range: 300, period: 0.8, projSpeed: 880 },
+      q: { name: 'Orbe Solar', cd: 7, dmg: 100, heal: 140, range: 560, width: 22, projSpeed: 840 },
       r: { name: 'Zona Radiante', cd: 45, radius: 220, dur: 4, castRange: 450,
            asPct: 0.2, healPs: 40, tele: 0.4, tick: 0.5 },
     },

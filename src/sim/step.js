@@ -217,6 +217,16 @@ function updateHero(st, h, cmd) {
 
   checkUltUnlock(st, h);
 
+  // fonte: cura rápida perto da PRÓPRIA base (feedback de playtest humano)
+  const F = M.BAL.fountain;
+  if (V.dist(h.pos, st.map.bases[h.team]) <= F.radius) {
+    h.fntT -= DT;
+    if (h.fntT <= 0) {
+      h.fntT = F.tick;
+      heal(st, null, h, h.maxHp * F.healPctPs * F.tick);
+    }
+  } else h.fntT = 0;
+
   // dash em andamento
   if (h.dash) {
     const d = h.dash;

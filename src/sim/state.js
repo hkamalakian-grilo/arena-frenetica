@@ -23,7 +23,7 @@ function makeHero(st, heroId, team, slot, isBot) {
     empowerT: 0,                  // Nix Q: próximo AA reforçado
     zoneAs: false,                // dentro da Zona Radiante aliada (Sol R)
     dash: null,                   // { type, dir, remaining, speed, targetId }
-    respawnT: 0,
+    respawnT: 0, fntT: 0,         // fntT: pulso de cura da fonte
     bushIdx: -1, visTo: [team === 0, team === 1],
     kills: 0, deaths: 0, assists: 0,
     lastDamagers: [],             // { heroId, t } p/ assists
