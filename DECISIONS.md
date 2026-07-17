@@ -41,6 +41,13 @@ Cada linha: a decisão e a justificativa em uma linha.
 
 ## Apresentação / controles
 
+- **Direção de arte "toy/cartoon"** (pedido do usuário, referência Clash Royale): arena clara de
+  grama em xadrez com caminhos de terra, sombras sob as unidades, contorno grosso, gradiente de
+  luz de cima, **olhos com piscada** e bounce ao andar, torres de pedra com cúpula do time e
+  bandeirinha tremulando, bases como castelinhos, pit rochoso com brasas, HUD com molduras
+  douradas. Continua 100% desenhado por código no Canvas (sem sprites, §13) e mexeu SÓ na camada
+  de render — a simulação não mudou em nada.
+
 - **Hitstop congela a simulação, não o render** (40ms): partículas e HUD continuam vivos, o
   impacto "morde" sem a tela travar.
 - **Números de dano só em heróis/estruturas/dragão**; minions recebem faísca — 30+ floats de
