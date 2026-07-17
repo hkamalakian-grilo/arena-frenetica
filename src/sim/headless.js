@@ -22,7 +22,8 @@ function pickComp(seed) {
  */
 function runMatch(opts) {
   const heroes = opts.heroes || pickComp(opts.seed);
-  const st = M.createMatch({ mapId: opts.mapId, heroes, playerIndex: -1, seed: opts.seed });
+  const st = M.createMatch({ mapId: opts.mapId, heroes, playerIndex: -1, seed: opts.seed,
+                             difficulty: opts.difficulty });
   const stats = {
     mapId: opts.mapId, seed: opts.seed, heroes,
     duration: 0, winner: -1, reason: '',

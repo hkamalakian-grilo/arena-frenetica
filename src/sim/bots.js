@@ -57,18 +57,33 @@ function alliedMinionsNearTower(st, team, tower) {
   return n;
 }
 
+// dificuldade efetiva do bot: inimigos (time 1) usam a escolhida; aliado é 'normal'
+function dfOf(st, h) {
+  const d = h.team === 1 ? st.difficulty : 'normal';
+  return M.BAL.difficulty[d] || M.BAL.difficulty.normal;
+}
+
 // previsão simples de posição p/ skillshot (lead pela velocidade do tick anterior)
-function predictDir(h, target, projSpeed) {
+// com erro de mira conforme a dificuldade
+function predictDir(st, h, target, projSpeed) {
   const vel = { x: (target.pos.x - target.prevPos.x) / M.DT, y: (target.pos.y - target.prevPos.y) / M.DT };
   const t = V.dist(h.pos, target.pos) / projSpeed;
   const p = { x: target.pos.x + vel.x * t, y: target.pos.y + vel.y * t };
-  return V.towards(h.pos, p);
+  const dir = V.towards(h.pos, p);
+  const err = dfOf(st, h).aimErr;
+  if (!err) return dir;
+  const a = (st.rng() * 2 - 1) * err;
+  const cos = Math.cos(a), sin = Math.sin(a);
+  return { x: dir.x * cos - dir.y * sin, y: dir.x * sin + dir.y * cos };
 }
 
 function castAt(mind, slot, dir, dist) { mind.cast = { slot, dir, dist }; }
 
 // habilidades ofensivas conforme o herói (usado em POKE/ALLIN/OBJETIVO)
 function offensiveCasts(st, h, target, committing) {
+  // no fácil, o bot "esquece" de usar a habilidade parte das vezes
+  const DF = dfOf(st, h);
+  if (DF.castChance < 1 && st.rng() > DF.castChance) return;
   const mind = h.mind;
   const d = V.dist(h.pos, target.pos);
   const cfg = M.BAL.heroes[h.hero];
@@ -81,7 +96,7 @@ function offensiveCasts(st, h, target, committing) {
     if (h.rCd <= 0 && h.ultUnlocked && committing && d < cfg.r.castRange) {
       castAt(mind, 'r', V.towards(h.pos, target.pos), d); return;
     }
-    if (h.qCd <= 0 && d < cfg.q.range * 0.95) { castAt(mind, 'q', predictDir(h, target, cfg.q.projSpeed)); return; }
+    if (h.qCd <= 0 && d < cfg.q.range * 0.95) { castAt(mind, 'q', predictDir(st, h, target, cfg.q.projSpeed)); return; }
   } else if (h.hero === 'nix') {
     if (h.rCd <= 0 && h.ultUnlocked && hpPct(target) < cfg.r.execHpPct && d < cfg.r.range) {
       castAt(mind, 'r', V.towards(h.pos, target.pos)); return;
@@ -99,13 +114,14 @@ function offensiveCasts(st, h, target, committing) {
       if (ally && ally.alive && hpPct(ally) < 0.7 && V.dist(h.pos, ally.pos) < cfg.q.range) {
         castAt(mind, 'q', V.towards(h.pos, ally.pos)); return;
       }
-      if (d < cfg.q.range * 0.95) { castAt(mind, 'q', predictDir(h, target, cfg.q.projSpeed)); return; }
+      if (d < cfg.q.range * 0.95) { castAt(mind, 'q', predictDir(st, h, target, cfg.q.projSpeed)); return; }
     }
   }
 }
 
 function decide(st, h) {
   const B = M.BAL.bots;
+  const DF = dfOf(st, h);
   const mind = h.mind;
   const myPct = hpPct(h);
   const enemies = visibleEnemies(st, h.team);
@@ -119,11 +135,11 @@ function decide(st, h) {
   // rastreio de lane vazia (rotação no Mapa B)
   if (st.map.lanes.length > 1) {
     const enemyInMyLane = enemies.some(e => laneOfPos(st, e.pos) === mind.lane);
-    mind.laneEmptyT = enemyInMyLane ? 0 : mind.laneEmptyT + B.tick;
+    mind.laneEmptyT = enemyInMyLane ? 0 : mind.laneEmptyT + DF.tick;
   }
 
-  // ---- RETREAT (§14): HP baixo → recuar p/ trás da torre, usando bush ----
-  const retreating = mind.state === 'RETREAT' ? myPct < B.retreatExitHpPct : myPct < B.retreatHpPct;
+  // ---- RETREAT (§14): HP baixo → recuar até a fonte, usando bush ----
+  const retreating = mind.state === 'RETREAT' ? myPct < B.retreatExitHpPct : myPct < DF.retreatHpPct;
   if (retreating) {
     mind.state = 'RETREAT';
     // recua até a FONTE (cura 8%/s) — atrás da torre não regenera nada
@@ -147,10 +163,10 @@ function decide(st, h) {
     }
   }
 
-  // ---- ALL-IN (§14): inimigo < 35% e dá pra comitar ----
+  // ---- ALL-IN (§14): inimigo com HP baixo e dá pra comitar ----
   else if ((() => {
-    const low = enemies.filter(e => hpPct(e) < B.allinTargetHpPct &&
-      V.dist(h.pos, e.pos) < B.chaseRange);
+    const low = enemies.filter(e => hpPct(e) < DF.allinTargetHpPct &&
+      V.dist(h.pos, e.pos) < B.chaseRange * DF.rangeMult);
     if (low.length && myPct > B.allinMinSelfHpPct) { mind.target = low[0].id; return true; }
     return false;
   })()) {
@@ -191,7 +207,7 @@ function decide(st, h) {
   }
 
   // ---- POKE/TRADE (§14): trocar dano mantendo distância ----
-  else if (near && V.dist(h.pos, near.pos) < B.pokeSightRange && myPct > B.pokeMinHpPct) {
+  else if (near && V.dist(h.pos, near.pos) < B.pokeSightRange * DF.rangeMult && myPct > B.pokeMinHpPct) {
     mind.state = 'POKE';
     const cfg = M.BAL.heroes[h.hero];
     const melee = !cfg.aa.projSpeed;
@@ -262,7 +278,7 @@ function think(st, h) {
   if (!h.alive) { mind.cast = null; return { move: { x: 0, y: 0 }, aaHeld: false, cast: null }; }
   if (st.time >= mind.nextThink) {
     decide(st, h);
-    mind.nextThink = st.time + M.BAL.bots.tick;
+    mind.nextThink = st.time + dfOf(st, h).tick;   // reação conforme a dificuldade
   }
   const cmd = { move: { x: 0, y: 0 }, aaHeld: mind.aaHeld, cast: mind.cast };
   mind.cast = null;   // cast dispara uma única vez

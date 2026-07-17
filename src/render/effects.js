@@ -207,7 +207,7 @@ function shakeOffset() {
   return { x: rnd(-k, k), y: rnd(-k, k) };
 }
 
-M.fx = { reset, ingest, update, consumeHitstop, shakeOffset,
+M.fx = { reset, ingest, update, consumeHitstop, shakeOffset, banner,
          particles: FX.particles, floaters: FX.floaters, banners: FX.banners,
          COLORS, teamColor, state: FX };
 })();

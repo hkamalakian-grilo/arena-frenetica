@@ -116,6 +116,19 @@ M.BAL = {
     },
   },
 
+  // ---- Dificuldade dos bots INIMIGOS (o aliado é sempre 'normal') ----
+  // tick = tempo de reação; aimErr = erro de mira em radianos (skillshots);
+  // rangeMult = quão longe enxergam ameaças/presas; retreat/allin = covardia/agressividade;
+  // castChance = chance de USAR a habilidade quando seria a hora; dmgMult = dano do time inimigo
+  difficulty: {
+    facil:   { tick: 0.55, aimErr: 0.30, rangeMult: 0.80, retreatHpPct: 0.42, allinTargetHpPct: 0.28,
+               castChance: 0.55, dmgMult: 0.85 },
+    normal:  { tick: 0.30, aimErr: 0,    rangeMult: 1.00, retreatHpPct: 0.30, allinTargetHpPct: 0.35,
+               castChance: 1.0,  dmgMult: 1.0 },
+    dificil: { tick: 0.20, aimErr: 0,    rangeMult: 1.15, retreatHpPct: 0.25, allinTargetHpPct: 0.42,
+               castChance: 1.0,  dmgMult: 1.12 },
+  },
+
   // ---- IA dos bots (§14) — thresholds expostos p/ tuning ----
   bots: {
     tick: 0.3,

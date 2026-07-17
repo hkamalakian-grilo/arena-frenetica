@@ -46,6 +46,25 @@ Cada linha: a decisão e a justificativa em uma linha.
 - **Empate absoluto aceito** (§10): implementado e sinalizado na tela de resultado; não ocorreu
   em ~120 partidas de bots.
 
+## Pacote "melhor jogo possível" (pedido do usuário)
+
+- **Parceiro escolhível + dificuldade**: o menu ganhou a linha "Parceiro (bot)" (qualquer um dos 4,
+  inclusive repetido) e o seletor Fácil/Normal/Difícil. A dificuldade afeta SÓ os bots inimigos
+  (aliado é sempre Normal) e vive em `BAL.difficulty`: tempo de reação, erro de mira em skillshot,
+  alcance de percepção, covardia/agressividade, chance de usar habilidade (Fácil "esquece" 45%)
+  e multiplicador de dano do time (0,85× / 1× / 1,12× — prática padrão do gênero). Validado em
+  espelhos: Fácil perde 2-8, Normal 4-6, Difícil vence 6-4 vs time normal; o modo Normal reproduz
+  bit a bit o comportamento calibrado anterior.
+- **Cerimônia de abertura**: painéis VOCÊS × INIMIGOS com os heróis apresentados, contagem
+  3-2-1-LUTE! com bipes; simulação parada e controles travados durante a contagem; toque pula.
+- **MVP e tabela pós-partida**: dano causado (sem overkill), cura feita (fonte não conta) e farm
+  (last hits) acumulados por herói na sim; MVP = melhor nota do time vencedor
+  (kills×3 + assist×1,5 + dano/250 + cura/200 + farm×0,6), coroa + destaque dourado.
+- **Acessórios por código** (sem sprites, §13 preservado): Brutus elmo+pluma+escudo que avança no
+  golpe; Lyra arco cuja corda puxa ao recarregar e solta ao atirar (flecha nocada visível);
+  Nix capuz + adagas que cruzam no ataque; Sol auréola flutuante + raios que flaram ao castar.
+  Mesmos desenhos no jogo, no menu e na apresentação.
+
 ## Apresentação / controles
 
 - **Direção de arte "toy/cartoon"** (pedido do usuário, referência Clash Royale): arena clara de

@@ -22,7 +22,9 @@ function findUnit(st, id) {
 }
 
 function heroDmgMult(st, h) {
-  return (1 + M.BAL.levelBonus.dmg * (h.level - 1)) *
+  // time 1 (bots inimigos) recebe o multiplicador da dificuldade escolhida
+  const dm = h.team === 1 ? (M.BAL.difficulty[st.difficulty] || M.BAL.difficulty.normal).dmgMult : 1;
+  return (1 + M.BAL.levelBonus.dmg * (h.level - 1)) * dm *
          (st.dragonBuffT[h.team] > 0 ? 1 + M.BAL.dragon.buffDmgPct : 1);
 }
 
@@ -51,6 +53,7 @@ function heal(st, src, tgt, amt) {
   const real = Math.min(tgt.maxHp - tgt.hp, Math.round(amt));
   if (real <= 0) return;
   tgt.hp += real;
+  if (src && src.kind === 'hero') src.healDone += real;   // MVP (fonte não conta: src null)
   st.events.push({ type: 'dmg', pos: { x: tgt.pos.x, y: tgt.pos.y }, amount: real,
                    cat: 'heal', targetId: tgt.id, targetKind: tgt.kind });
 }
@@ -103,6 +106,9 @@ function dealDamage(st, src, tgt, raw, cat, creditId) {
   if (creditHero) amount *= heroDmgMult(st, creditHero);
   amount = Math.max(1, Math.round(amount));
   tgt.hp -= amount;
+  if (creditHero && tgt.team !== creditHero.team) {
+    creditHero.dmgDealt += tgt.hp < 0 ? amount + tgt.hp : amount;   // MVP (sem overkill)
+  }
 
   st.events.push({ type: 'dmg', pos: { x: tgt.pos.x, y: tgt.pos.y }, amount, cat,
                    targetId: tgt.id, targetKind: tgt.kind, targetTeam: tgt.team });
@@ -133,6 +139,7 @@ function onDeath(st, u, src, creditHero) {
   const killerTeam = creditHero ? creditHero.team : (src ? src.team : -1);
 
   if (u.kind === 'minion') {
+    if (creditHero) creditHero.minionKills++;   // farm (last hit) p/ MVP
     if (killerTeam === 0 || killerTeam === 1) {
       const xpAmt = M.BAL.xp.minion[u.mtype] * M.BAL.xp.mapMult[st.mapId];
       const near = st.heroes.filter(h => h.team === killerTeam && h.alive &&

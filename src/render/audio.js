@@ -129,6 +129,9 @@ const SFX = {
   ultReady() { tone({ freq: 784, slideTo: 1568, dur: 0.28, vol: 0.07 }); },
   respawn()  { tone({ freq: 220, slideTo: 440, dur: 0.22, vol: 0.06 }); },
   bush()     { noise({ dur: 0.15, filter: 3200, filterType: 'highpass', vol: 0.06 }); },
+  count()    { tone({ freq: 660, type: 'square', dur: 0.1, vol: 0.09 }); },
+  fight()    { tone({ freq: 784, type: 'square', dur: 0.12, vol: 0.11 });
+               tone({ freq: 1046, type: 'square', dur: 0.2, vol: 0.11, delay: 0.1 }); },
   win()      { [523, 659, 784, 1046].forEach((f, i) => tone({ freq: f, type: 'triangle', dur: 0.16, vol: 0.1, delay: i * 0.11 })); },
   lose()     { [392, 330, 262].forEach((f, i) => tone({ freq: f, type: 'sawtooth', dur: 0.2, vol: 0.08, delay: i * 0.13 })); },
   draw()     { tone({ freq: 440, dur: 0.18, vol: 0.08 }); tone({ freq: 440, dur: 0.18, vol: 0.08, delay: 0.2 }); },

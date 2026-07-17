@@ -28,6 +28,7 @@ function makeHero(st, heroId, team, slot, isBot) {
     kills: 0, deaths: 0, assists: 0,
     lastDamagers: [],             // { heroId, t } p/ assists
     lvl4At: -1,                   // estatística p/ balance
+    dmgDealt: 0, healDone: 0, minionKills: 0,   // estatísticas p/ MVP
     // IA (preenchido em bots.js)
     mind: isBot ? { state: 'FARM', nextThink: slot * 0.07, lane: 0, moveTo: null,
                     cast: null, aaHeld: false, laneEmptyT: 0 } : null,
@@ -115,6 +116,7 @@ function createMatch(opts) {
     events: [],
     nav: null,
     playerIndex: opts.playerIndex !== undefined ? opts.playerIndex : 0,
+    difficulty: opts.difficulty || 'normal',   // afeta só os bots do time 1
   };
 
   const heroes = opts.heroes;

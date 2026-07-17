@@ -12,10 +12,11 @@ const ROSTER = ['brutus', 'lyra', 'nix', 'sol'];
 
 const APP = {
   screen: 'menu',              // 'menu' | 'game' | 'result'
-  menu: { hero: 'lyra', map: M.BAL.defaultMap },
+  menu: { hero: 'lyra', ally: 'sol', map: M.BAL.defaultMap, difficulty: 'normal' },
   st: null,
   acc: 0, last: 0, freeze: 0,
   endAt: 0,
+  introT: 0, lastCount: 4,     // cerimônia 3-2-1-LUTE!
   menuRects: null, resultRects: null,
   fpsVal: 0, fpsCount: 0, fpsT: 0,
   debug: /debug=1/.test(location.search),
@@ -29,18 +30,18 @@ function pickEnemies() {
 }
 
 function startMatch() {
-  const player = APP.menu.hero;
-  const ally = player !== 'sol' ? 'sol' : 'lyra';
   const [e1, e2] = pickEnemies();
   APP.st = M.createMatch({
     mapId: APP.menu.map,
-    heroes: [player, ally, e1, e2],
+    heroes: [APP.menu.hero, APP.menu.ally, e1, e2],
     playerIndex: 0,
     seed: (Date.now() ^ (Math.random() * 0x7fffffff)) >>> 0,
+    difficulty: APP.menu.difficulty,
   });
   M.fx.reset(0);
-  M.controls.enabled = true;
+  M.controls.enabled = false;              // libera quando a contagem acabar
   APP.acc = 0; APP.freeze = 0; APP.endAt = 0;
+  APP.introT = 3.6; APP.lastCount = 4;     // apresentação + 3-2-1-LUTE!
   APP.screen = 'game';
 }
 
@@ -49,7 +50,9 @@ function inRect(r, x, y) { return r && x >= r.x && x <= r.x + r.w && y >= r.y &&
 function onTap(x, y) {
   if (APP.screen === 'menu' && APP.menuRects) {
     for (const h of APP.menuRects.heroes) if (inRect(h, x, y)) { APP.menu.hero = h.id; return; }
+    for (const a of APP.menuRects.allies) if (inRect(a, x, y)) { APP.menu.ally = a.id; return; }
     for (const m of APP.menuRects.maps) if (inRect(m, x, y)) { APP.menu.map = m.id; return; }
+    for (const d of APP.menuRects.diffs) if (inRect(d, x, y)) { APP.menu.difficulty = d.id; return; }
     if (inRect(APP.menuRects.start, x, y)) startMatch();
   } else if (APP.screen === 'result' && APP.resultRects) {
     if (inRect(APP.resultRects.rematch, x, y)) startMatch();
@@ -71,6 +74,25 @@ function loop(now) {
   if (APP.screen === 'game' && APP.st) {
     // mobile em pé → pede paisagem (§2) e pausa
     if (view.h > view.w) { M.renderer.renderRotateHint(); APP.acc = 0; return; }
+
+    // cerimônia de abertura: duplas + 3-2-1-LUTE! (sim parada)
+    if (APP.introT > 0) {
+      APP.introT -= dtms / 1000;
+      M.fx.update(dtms / 1000, APP.st);
+      M.renderer.render(APP.st, 1, { playerTeam: 0, aimPreview: null, fps: 0 });
+      if (APP.introT > 0) {
+        M.renderer.renderIntro(APP.st, APP.introT);
+        const n = Math.ceil(Math.max(0, APP.introT - 0.6));
+        if (n !== APP.lastCount) {
+          APP.lastCount = n;
+          if (n >= 1) M.audio._sfx.count(); else M.audio._sfx.fight();
+        }
+      } else {
+        M.controls.enabled = true;
+        M.controls.queued.length = 0;
+      }
+      return;
+    }
 
     // hitstop (§13): congela a simulação, não o render
     if (APP.freeze > 0) APP.freeze -= dtms;
@@ -114,7 +136,10 @@ function boot() {
   M.renderer.init(canvas);
   M.controls.init(canvas);
   M.audio.init(canvas);
-  M.controls.tapCb = (x, y) => { if (APP.screen !== 'game') onTap(x, y); };
+  M.controls.tapCb = (x, y) => {
+    if (APP.screen !== 'game') onTap(x, y);
+    else if (APP.introT > 0.7) APP.introT = 0.7;   // toque pula a contagem
+  };
   APP.last = performance.now();
   requestAnimationFrame(loop);
 }

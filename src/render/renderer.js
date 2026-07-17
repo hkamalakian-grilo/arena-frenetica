@@ -279,7 +279,7 @@ function drawEyes(c, x, y, r, facing, id, now, size) {
   }
 }
 
-/** Corpo de herói cartoon (usado no jogo e nos cards do menu). */
+/** Corpo de herói cartoon (usado no jogo, menu e apresentação). */
 function drawHeroBody(c, cfg, x, y, r, facing, team, opts) {
   const o = opts || {};
   const now = o.now || 0;
@@ -292,6 +292,11 @@ function drawHeroBody(c, cfg, x, y, r, facing, team, opts) {
   g.addColorStop(1, shade(cfg.color, -0.28));
   heroPath(c, cfg.shape, x, y, r, facing);
   c.fillStyle = g; c.fill();
+  // capuz do Nix (por baixo dos olhos)
+  if (o.kind === 'nix') {
+    heroPath(c, 'tri', x - facing.x * r * 0.24, y - facing.y * r * 0.24, r * 0.68, facing);
+    c.fillStyle = 'rgba(40,29,68,0.88)'; c.fill();
+  }
   // anel do time
   heroPath(c, cfg.shape, x, y, r, facing);
   c.lineWidth = 3; c.strokeStyle = team >= 0 ? TEAM[team] : '#e8eaf0'; c.stroke();
@@ -301,6 +306,117 @@ function drawHeroBody(c, cfg, x, y, r, facing, team, opts) {
   c.beginPath(); c.ellipse(x - r * 0.18, y - r * 0.42, r * 0.5, r * 0.24, -0.35, 0, Math.PI * 2); c.fill();
   c.globalAlpha = o.alpha !== undefined ? o.alpha : 1;
   drawEyes(c, x, y, r, facing, o.id || 0, now, 1);
+  if (o.kind) drawAccessories(c, o.kind, x, y, r, facing, team, o);
+}
+
+/** Acessórios e animação de ataque por herói — tudo por código, sem sprites. */
+function drawAccessories(c, kind, x, y, r, facing, team, o) {
+  const now = o.now || 0;
+  const atkK = o.atkK || 0;                                   // 1 logo após atacar → 0
+  const chargeK = o.chargeK !== undefined ? o.chargeK : 1;    // 0 recém-atirou → 1 pronto
+  const a0 = Math.atan2(facing.y, facing.x);
+  const tc = team >= 0 ? TEAM[team] : GOLD;
+  const baseAlpha = o.alpha !== undefined ? o.alpha : 1;
+
+  if (kind === 'brutus') {
+    // elmo de aço com pluma do time
+    c.save(); c.translate(x, y);
+    c.lineWidth = r * 0.3; c.strokeStyle = '#9aa5b4';
+    c.beginPath(); c.arc(0, -r * 0.16, r * 0.8, Math.PI * 1.06, Math.PI * 1.94); c.stroke();
+    c.lineWidth = 2; c.strokeStyle = INK;
+    c.beginPath(); c.arc(0, -r * 0.16, r * 0.95, Math.PI * 1.06, Math.PI * 1.94); c.stroke();
+    c.fillStyle = tc;
+    roundRect(c, -r * 0.13, -r * 1.3, r * 0.26, r * 0.42, r * 0.1); c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = INK;
+    roundRect(c, -r * 0.13, -r * 1.3, r * 0.26, r * 0.42, r * 0.1); c.stroke();
+    c.restore();
+    // escudo no braço — empurra à frente no golpe
+    const sx = x + (-facing.y) * r * 1.02 + facing.x * r * 0.5 * atkK;
+    const sy = y + facing.x * r * 1.02 + facing.y * r * 0.5 * atkK;
+    c.fillStyle = INK;
+    c.beginPath(); c.arc(sx, sy, r * 0.48 + 2, 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#b9c2d0';
+    c.beginPath(); c.arc(sx, sy, r * 0.48, 0, Math.PI * 2); c.fill();
+    c.fillStyle = tc;
+    c.beginPath(); c.arc(sx, sy, r * 0.19, 0, Math.PI * 2); c.fill();
+    if (atkK > 0.2) {   // arco da pancada
+      c.globalAlpha = atkK * 0.85 * baseAlpha;
+      c.lineWidth = 5; c.strokeStyle = '#ffffff'; c.lineCap = 'round';
+      const sw = (1 - atkK) * 0.6;
+      c.beginPath(); c.arc(x, y, r * 1.5, a0 - 0.75 + sw, a0 + 0.15 + sw); c.stroke();
+      c.lineCap = 'butt';
+    }
+  } else if (kind === 'lyra') {
+    // arco à frente: corda puxa ao carregar e solta ao atirar
+    c.save(); c.translate(x, y); c.rotate(a0);
+    const Rb = r * 1.05, span = 0.95;
+    c.lineWidth = 3.5; c.strokeStyle = '#7c4f22'; c.lineCap = 'round';
+    c.beginPath(); c.arc(r * 0.1, 0, Rb, -span, span); c.stroke();
+    const tx = r * 0.1 + Math.cos(span) * Rb, ty = Math.sin(span) * Rb;
+    const nock = r * 0.1 + Rb - chargeK * 0.72 * r * 0.9;
+    c.lineWidth = 1.6; c.strokeStyle = '#f2e9d8';
+    c.beginPath(); c.moveTo(tx, -ty); c.lineTo(nock, 0); c.lineTo(tx, ty); c.stroke();
+    if (chargeK > 0.45) {   // flecha nocada quando quase pronta
+      c.lineWidth = 2.4; c.strokeStyle = '#e8dcc0';
+      c.beginPath(); c.moveTo(nock - r * 0.15, 0); c.lineTo(nock + r * 0.7, 0); c.stroke();
+      c.fillStyle = '#e8dcc0';
+      c.beginPath(); c.moveTo(nock + r * 0.7, -3); c.lineTo(nock + r * 0.95, 0); c.lineTo(nock + r * 0.7, 3);
+      c.closePath(); c.fill();
+    }
+    c.lineCap = 'butt';
+    c.restore();
+  } else if (kind === 'nix') {
+    // adagas nas mãos — cruzam no golpe
+    c.save(); c.translate(x, y); c.rotate(a0);
+    for (const sgn of [-1, 1]) {
+      c.save();
+      c.translate(r * 0.28, sgn * r * 0.8);
+      c.rotate(sgn * (-0.3 + atkK * 1.15));
+      c.fillStyle = '#d8dee9';
+      c.beginPath(); c.moveTo(0, -2.2); c.lineTo(r * 0.85, 0); c.lineTo(0, 2.2); c.closePath(); c.fill();
+      c.lineWidth = 1.4; c.strokeStyle = INK; c.stroke();
+      c.fillStyle = '#5b4a86'; c.fillRect(-r * 0.22, -2.2, r * 0.22, 4.4);
+      c.restore();
+    }
+    c.restore();
+    if (atkK > 0.25) {   // corte duplo
+      c.globalAlpha = atkK * 0.8 * baseAlpha;
+      c.lineWidth = 3; c.strokeStyle = '#e6dcff'; c.lineCap = 'round';
+      c.beginPath(); c.arc(x, y, r * 1.4, a0 - 0.85, a0 + 0.1); c.stroke();
+      c.beginPath(); c.arc(x, y, r * 1.12, a0 + 0.85, a0 - 0.1, true); c.stroke();
+      c.lineCap = 'butt';
+    }
+  } else if (kind === 'sol') {
+    // raios girando (flaram ao atacar) + auréola flutuante
+    const flare = 0.2 + atkK * 0.9;
+    c.save(); c.translate(x, y);
+    c.lineWidth = 3; c.lineCap = 'round'; c.strokeStyle = GOLD;
+    for (let i = 0; i < 8; i++) {
+      const a = now * 0.7 + i * Math.PI / 4;
+      c.globalAlpha = (0.38 + 0.22 * Math.sin(now * 3 + i * 1.4) + atkK * 0.3) * baseAlpha;
+      c.beginPath();
+      c.moveTo(Math.cos(a) * r * 1.12, Math.sin(a) * r * 1.12);
+      c.lineTo(Math.cos(a) * r * (1.32 + flare * 0.4), Math.sin(a) * r * (1.32 + flare * 0.4));
+      c.stroke();
+    }
+    c.lineCap = 'butt';
+    const hb = Math.sin(now * 2.2 + (o.id || 0)) * 2;
+    c.globalAlpha = 0.92 * baseAlpha;
+    c.lineWidth = 3.5; c.strokeStyle = GOLD;
+    c.beginPath(); c.ellipse(0, -r * 1.34 + hb, r * 0.6, r * 0.2, 0, 0, Math.PI * 2); c.stroke();
+    c.restore();
+  }
+  c.globalAlpha = baseAlpha;
+}
+
+function drawCrown(c, x, y, s) {
+  c.fillStyle = GOLD;
+  c.beginPath();
+  c.moveTo(x - s, y + s * 0.5); c.lineTo(x - s, y - s * 0.3); c.lineTo(x - s * 0.45, y + s * 0.05);
+  c.lineTo(x, y - s * 0.55); c.lineTo(x + s * 0.45, y + s * 0.05); c.lineTo(x + s, y - s * 0.3);
+  c.lineTo(x + s, y + s * 0.5);
+  c.closePath(); c.fill();
+  c.lineWidth = 1.5; c.strokeStyle = INK; c.stroke();
 }
 
 // ---- barras de vida estilo pílula ----
@@ -616,7 +732,8 @@ function render(st, alpha, opts) {
     c.save();
     c.translate(p.x, py); c.scale(puff, 2 - puff > 0 ? (2 - puff) * 0.5 + 0.5 : 1);
     drawHeroBody(c, cfg, 0, 0, h.radius, h.facing, h.team,
-                 { id: h.id, now, alpha: inBushAlly ? 0.55 : 1 });
+                 { id: h.id, now, alpha: inBushAlly ? 0.55 : 1, kind: h.hero, atkK,
+                   chargeK: 1 - Math.min(1, h.aaCd / (cfg.aa.period || 1)) });
     c.restore();
     if (isPlayer) c.restore();
 
@@ -1023,104 +1140,225 @@ function drawMiniMap(c, map, x, y, w, h) {
 function renderMenu(menu) {
   const c = R.ctx, view = R.view;
   const now = performance.now() / 1000;
+  const W = view.w, H = view.h, cx = W / 2;
   c.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
-  const g = c.createLinearGradient(0, 0, 0, view.h);
+  const g = c.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0, '#1a3020'); g.addColorStop(1, '#0d1811');
-  c.fillStyle = g; c.fillRect(0, 0, view.w, view.h);
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
   // bolinhas decorativas flutuando
   for (let i = 0; i < 14; i++) {
     const ph = (now * 0.05 + i * 0.13) % 1;
     c.globalAlpha = 0.05 + 0.04 * Math.sin(i);
     c.fillStyle = i % 3 ? '#7ec850' : GOLD;
     c.beginPath();
-    c.arc((hash01(i, 7) * 1.2 * view.w) % view.w, view.h * (1 - ph), 20 + hash01(i, 3) * 30, 0, Math.PI * 2);
+    c.arc((hash01(i, 7) * 1.2 * W) % W, H * (1 - ph), 20 + hash01(i, 3) * 30, 0, Math.PI * 2);
     c.fill();
   }
   c.globalAlpha = 1;
 
-  const cx = view.w / 2;
   c.textAlign = 'center';
-  c.font = `900 ${Math.min(46, view.w * 0.052)}px ${FONT}`;
+  c.font = `900 ${Math.min(38, W * 0.045)}px ${FONT}`;
   c.lineWidth = 8; c.strokeStyle = 'rgba(15,22,14,0.9)';
-  c.strokeText('ARENA FRENÉTICA', cx, view.h * 0.11);
+  c.strokeText('ARENA FRENÉTICA', cx, H * 0.075);
   c.fillStyle = GOLD;
-  c.fillText('ARENA FRENÉTICA', cx, view.h * 0.11);
-  c.font = `700 ${Math.min(15, view.w * 0.02)}px ${FONT}`;
+  c.fillText('ARENA FRENÉTICA', cx, H * 0.075);
+  c.font = `700 ${Math.min(13, W * 0.018)}px ${FONT}`;
   c.fillStyle = 'rgba(210,230,200,0.9)';
-  c.fillText('mini-MOBA 2v2 — 3 minutos, zero downtime', cx, view.h * 0.155);
+  c.fillText('mini-MOBA 2v2 — 3 minutos, zero downtime', cx, H * 0.112);
 
-  const rects = { heroes: [], maps: [], start: null };
-
-  // cards de herói
+  const rects = { heroes: [], allies: [], maps: [], diffs: [], start: null };
   const ids = ['brutus', 'lyra', 'nix', 'sol'];
-  const cw = Math.min(150, view.w * 0.17), ch = Math.min(120, view.h * 0.24), gap = 12;
-  const x0 = cx - (cw * 4 + gap * 3) / 2, y0 = view.h * 0.2;
+  const label = (txt, yy) => {
+    c.font = `800 ${Math.min(12, H * 0.023)}px ${FONT}`;
+    c.fillStyle = 'rgba(190,215,180,0.75)';
+    c.fillText(txt, cx, yy);
+  };
+  const card = (x, y, w, h, sel) => {
+    c.fillStyle = sel ? 'rgba(45,66,40,0.95)' : 'rgba(24,36,26,0.92)';
+    roundRect(c, x, y, w, h, 12); c.fill();
+    c.lineWidth = sel ? 3 : 1.8;
+    c.strokeStyle = sel ? GOLD : 'rgba(110,140,105,0.5)';
+    roundRect(c, x, y, w, h, 12); c.stroke();
+  };
+
+  // ---- SEU HERÓI ----
+  const cw = Math.min(132, W * 0.145), ch = Math.min(100, H * 0.175), gap = 10;
+  const y0 = H * 0.165;
+  label('SEU HERÓI', y0 - 7);
+  let x0 = cx - (cw * 4 + gap * 3) / 2;
   for (let i = 0; i < 4; i++) {
     const id = ids[i], cfg = M.BAL.heroes[id];
     const x = x0 + i * (cw + gap);
     const sel = menu.hero === id;
-    c.fillStyle = sel ? 'rgba(45,66,40,0.95)' : 'rgba(24,36,26,0.92)';
-    roundRect(c, x, y0, cw, ch, 14); c.fill();
-    c.lineWidth = sel ? 3.5 : 2;
-    c.strokeStyle = sel ? GOLD : 'rgba(110,140,105,0.5)';
-    roundRect(c, x, y0, cw, ch, 14); c.stroke();
-    const bounce = sel ? Math.sin(now * 5) * 2.5 : 0;
-    drawHeroBody(c, cfg, x + cw / 2, y0 + ch * 0.34 + bounce, 21, { x: 1, y: 0 }, -1,
-                 { id: i * 7, now });
+    card(x, y0, cw, ch, sel);
+    const bounce = sel ? Math.sin(now * 5) * 2 : 0;
+    drawHeroBody(c, cfg, x + cw / 2, y0 + ch * 0.37 + bounce, Math.min(18, ch * 0.19),
+                 { x: 1, y: 0 }, -1, { id: i * 7, now, kind: id });
     c.fillStyle = '#ffffff';
-    c.font = `900 ${Math.min(15, cw * 0.11)}px ${FONT}`;
-    c.fillText(cfg.name, x + cw / 2, y0 + ch * 0.68);
+    c.font = `900 ${Math.min(13.5, ch * 0.14)}px ${FONT}`;
+    c.fillText(cfg.name, x + cw / 2, y0 + ch * 0.74);
     c.fillStyle = 'rgba(190,215,180,0.9)';
-    c.font = `700 ${Math.min(11.5, cw * 0.085)}px ${FONT}`;
-    c.fillText(cfg.role, x + cw / 2, y0 + ch * 0.84);
+    c.font = `700 ${Math.min(10.5, ch * 0.11)}px ${FONT}`;
+    c.fillText(cfg.role, x + cw / 2, y0 + ch * 0.9);
     rects.heroes.push({ id, x, y: y0, w: cw, h: ch });
   }
 
-  // cards de mapa
-  const mw = Math.min(240, view.w * 0.26), mh = Math.min(150, view.h * 0.28);
-  const my = y0 + ch + view.h * 0.045;
-  const mx0 = cx - (mw * 2 + 20) / 2;
+  // ---- PARCEIRO (BOT) ----
+  const aw = Math.min(106, W * 0.115), ah = Math.min(70, H * 0.13);
+  const y1 = y0 + ch + H * 0.052;
+  label('PARCEIRO (BOT)', y1 - 7);
+  const x0a = cx - (aw * 4 + gap * 3) / 2;
+  for (let i = 0; i < 4; i++) {
+    const id = ids[i], cfg = M.BAL.heroes[id];
+    const x = x0a + i * (aw + gap);
+    const sel = menu.ally === id;
+    card(x, y1, aw, ah, sel);
+    drawHeroBody(c, cfg, x + aw / 2, y1 + ah * 0.42, Math.min(13, ah * 0.2),
+                 { x: 1, y: 0 }, 0, { id: 40 + i, now, kind: id });
+    c.fillStyle = '#ffffff';
+    c.font = `800 ${Math.min(11.5, ah * 0.17)}px ${FONT}`;
+    c.fillText(cfg.name, x + aw / 2, y1 + ah * 0.87);
+    rects.allies.push({ id, x, y: y1, w: aw, h: ah });
+  }
+
+  // ---- MAPA + DIFICULDADE ----
+  const mw = Math.min(196, W * 0.2), mh = Math.min(112, H * 0.2);
+  const dw = Math.min(126, W * 0.135), dh = Math.min(30, H * 0.058), dgap = 8;
+  const groupW = mw * 2 + 14 + 26 + dw;
+  const y2 = y1 + ah + H * 0.052;
+  const gx = cx - groupW / 2;
+  c.font = `800 ${Math.min(12, H * 0.023)}px ${FONT}`;
+  c.fillStyle = 'rgba(190,215,180,0.75)';
+  c.fillText('MAPA', gx + mw + 7, y2 - 7);
+  c.fillText('DIFICULDADE', gx + mw * 2 + 40 + dw / 2 - 14, y2 - 7);
   for (let i = 0; i < 2; i++) {
     const id = i === 0 ? 'A' : 'B';
     const map = M.MAPS[id];
-    const x = mx0 + i * (mw + 20);
+    const x = gx + i * (mw + 14);
     const sel = menu.map === id;
-    c.fillStyle = sel ? 'rgba(45,66,40,0.95)' : 'rgba(24,36,26,0.92)';
-    roundRect(c, x, my, mw, mh, 14); c.fill();
-    c.lineWidth = sel ? 3.5 : 2;
-    c.strokeStyle = sel ? GOLD : 'rgba(110,140,105,0.5)';
-    roundRect(c, x, my, mw, mh, 14); c.stroke();
-    drawMiniMap(c, map, x + 10, my + 8, mw - 20, (mw - 20) * 9 / 16 * 0.82);
+    card(x, y2, mw, mh, sel);
+    drawMiniMap(c, map, x + 8, y2 + 7, mw - 16, (mw - 16) * 9 / 16 * 0.78);
     c.fillStyle = '#ffffff';
-    c.font = `900 14px ${FONT}`;
-    c.fillText(`Mapa ${id} — ${map.name}`, x + mw / 2, my + mh - 26);
-    c.fillStyle = 'rgba(190,215,180,0.9)';
-    c.font = `700 10.5px ${FONT}`;
-    c.fillText(map.desc, x + mw / 2, my + mh - 10);
-    rects.maps.push({ id, x, y: my, w: mw, h: mh });
+    c.font = `900 ${Math.min(12, mh * 0.12)}px ${FONT}`;
+    c.fillText(`${id} — ${map.name}`, x + mw / 2, y2 + mh - 9);
+    rects.maps.push({ id, x, y: y2, w: mw, h: mh });
+  }
+  const diffs = [['facil', 'Fácil'], ['normal', 'Normal'], ['dificil', 'Difícil']];
+  const dx = gx + mw * 2 + 40;
+  for (let i = 0; i < 3; i++) {
+    const [id, nome] = diffs[i];
+    const y = y2 + i * (dh + dgap);
+    const sel = menu.difficulty === id;
+    c.fillStyle = sel ? 'rgba(255,211,92,0.92)' : 'rgba(24,36,26,0.92)';
+    roundRect(c, dx, y, dw, dh, dh / 2); c.fill();
+    c.lineWidth = sel ? 2.5 : 1.8;
+    c.strokeStyle = sel ? '#8a6210' : 'rgba(110,140,105,0.5)';
+    roundRect(c, dx, y, dw, dh, dh / 2); c.stroke();
+    c.fillStyle = sel ? '#4a3608' : 'rgba(220,232,215,0.9)';
+    c.font = `900 ${Math.min(13, dh * 0.48)}px ${FONT}`;
+    c.fillText(nome, dx + dw / 2, y + dh * 0.66);
+    rects.diffs.push({ id, x: dx, y, w: dw, h: dh });
   }
 
-  // botão jogar (dourado, gordinho)
-  const bw = Math.min(260, view.w * 0.32), bh = 56;
-  const bx = cx - bw / 2, byy = Math.min(view.h * 0.88, my + mh + 24);
+  // ---- JOGAR ----
+  const bw = Math.min(250, W * 0.3), bh = Math.min(52, H * 0.095);
+  const bx = cx - bw / 2, byy = Math.min(H * 0.9 - bh, y2 + mh + H * 0.03);
   const pulse = 1 + 0.02 * Math.sin(now * 4);
   c.save();
   c.translate(cx, byy + bh / 2); c.scale(pulse, pulse); c.translate(-cx, -(byy + bh / 2));
   c.fillStyle = 'rgba(15,22,14,0.8)';
-  roundRect(c, bx, byy + 4, bw, bh, 18); c.fill();
+  roundRect(c, bx, byy + 4, bw, bh, 16); c.fill();
   const bg = c.createLinearGradient(0, byy, 0, byy + bh);
   bg.addColorStop(0, '#ffe28a'); bg.addColorStop(1, '#f4b62e');
   c.fillStyle = bg;
-  roundRect(c, bx, byy, bw, bh, 18); c.fill();
+  roundRect(c, bx, byy, bw, bh, 16); c.fill();
   c.lineWidth = 3; c.strokeStyle = '#8a6210';
-  roundRect(c, bx, byy, bw, bh, 18); c.stroke();
+  roundRect(c, bx, byy, bw, bh, 16); c.stroke();
   c.fillStyle = '#5c430c';
-  c.font = `900 23px ${FONT}`;
-  c.fillText('JOGAR  ▶', cx, byy + 37);
+  c.font = `900 ${Math.min(21, bh * 0.42)}px ${FONT}`;
+  c.fillText('JOGAR  ▶', cx, byy + bh * 0.65);
   c.restore();
   rects.start = { x: bx, y: byy, w: bw, h: bh };
 
   return rects;
+}
+
+// ---- apresentação das duplas + contagem (cerimônia de início) ----
+
+function renderIntro(st, t) {
+  const c = R.ctx, view = R.view;
+  const W = view.w, H = view.h, cx = W / 2;
+  const now = performance.now() / 1000;
+  c.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+  c.fillStyle = 'rgba(9,14,10,0.6)';
+  c.fillRect(0, 0, W, H);
+
+  c.textAlign = 'center';
+  c.font = `700 ${Math.min(14, H * 0.028)}px ${FONT}`;
+  c.fillStyle = 'rgba(210,230,200,0.85)';
+  c.fillText(`Mapa ${st.mapId} — ${st.map.name}`, cx, H * 0.1);
+
+  const pw = Math.min(290, W * 0.32), ph = Math.min(150, H * 0.3);
+  const py = H * 0.16;
+  const panels = [
+    { x: cx - pw - Math.min(60, W * 0.055), team: 0, idx: [0, 1], tag: 'VOCÊS' },
+    { x: cx + Math.min(60, W * 0.055), team: 1, idx: [2, 3], tag: 'INIMIGOS' },
+  ];
+  for (const P of panels) {
+    c.fillStyle = P.team === 0 ? 'rgba(24,38,64,0.94)' : 'rgba(66,28,28,0.94)';
+    roundRect(c, P.x, py, pw, ph, 16); c.fill();
+    c.lineWidth = 3; c.strokeStyle = TEAM[P.team];
+    roundRect(c, P.x, py, pw, ph, 16); c.stroke();
+    c.font = `900 ${Math.min(14, ph * 0.11)}px ${FONT}`;
+    c.fillStyle = TEAM_LIGHT[P.team];
+    c.fillText(P.tag, P.x + pw / 2, py + ph * 0.17);
+    P.idx.forEach((hi, k) => {
+      const h = st.heroes[hi];
+      const cfg = M.BAL.heroes[h.hero];
+      const hx = P.x + pw * (k === 0 ? 0.3 : 0.7), hy = py + ph * 0.52;
+      const rr = Math.min(25, ph * 0.18);
+      drawHeroBody(c, cfg, hx, hy + Math.sin(now * 3 + hi) * 2, rr,
+                   { x: P.team === 0 ? 1 : -1, y: 0 }, P.team,
+                   { id: hi, now, kind: h.hero });
+      c.font = `800 ${Math.min(12.5, ph * 0.1)}px ${FONT}`;
+      c.fillStyle = '#ffffff';
+      c.fillText(cfg.name, hx, py + ph * 0.88);
+      if (st.playerIndex === hi) {
+        c.font = `900 ${Math.min(10, ph * 0.08)}px ${FONT}`;
+        c.fillStyle = GOLD;
+        c.fillText('VOCÊ', hx, py + ph * 0.3);
+      }
+    });
+  }
+  c.font = `900 ${Math.min(34, H * 0.07)}px ${FONT}`;
+  c.lineWidth = 6; c.strokeStyle = 'rgba(15,22,14,0.9)';
+  c.strokeText('VS', cx, py + ph * 0.58);
+  c.fillStyle = GOLD;
+  c.fillText('VS', cx, py + ph * 0.58);
+
+  // contagem 3-2-1-LUTE!
+  const n = Math.ceil(Math.max(0, t - 0.6));
+  const cy = H * 0.72;
+  if (n >= 1) {
+    const k = Math.max(0, Math.min(1, (t - 0.6) - (n - 1)));   // 1 no início do número → 0
+    const size = Math.min(120, H * 0.24) * (1 + 0.3 * k);
+    c.globalAlpha = 0.5 + 0.5 * k;
+    c.font = `900 ${Math.round(size)}px ${FONT}`;
+    c.lineWidth = 10; c.strokeStyle = 'rgba(15,22,14,0.9)';
+    c.strokeText(String(n), cx, cy);
+    c.fillStyle = '#ffffff';
+    c.fillText(String(n), cx, cy);
+  } else {
+    const k = Math.max(0, t / 0.6);   // 1 → 0 no fim
+    c.globalAlpha = Math.min(1, k * 3);
+    const size = Math.min(110, H * 0.22) * (1.3 - 0.3 * k);
+    c.font = `900 ${Math.round(size)}px ${FONT}`;
+    c.lineWidth = 10; c.strokeStyle = 'rgba(15,22,14,0.9)';
+    c.strokeText('LUTE!', cx, cy);
+    c.fillStyle = GOLD;
+    c.fillText('LUTE!', cx, cy);
+  }
+  c.globalAlpha = 1;
 }
 
 // ---- tela de resultado (§3) ----
@@ -1156,22 +1394,63 @@ function renderResult(st, opts) {
   c.fillStyle = 'rgba(220,232,215,0.95)';
   c.fillText(REASONS[st.winReason] || '', cx, view.h * 0.35);
 
-  const p = st.playerIndex >= 0 ? st.heroes[st.playerIndex] : st.heroes[0];
+  // ---- tabela de estatísticas + MVP ----
+  const mvpScore = (h) => h.kills * 3 + h.assists * 1.5 + h.dmgDealt / 250 +
+                          h.healDone / 200 + h.minionKills * 0.6;
+  const candidates = st.winner === 2 ? st.heroes : st.heroes.filter(h => h.team === st.winner);
+  let mvp = candidates[0];
+  for (const h of candidates) if (mvpScore(h) > mvpScore(mvp)) mvp = h;
+
+  const tw2 = Math.min(600, view.w * 0.72);
+  const colN = cx - tw2 / 2 + 12;
+  const col = (k) => cx - tw2 / 2 + tw2 * k;
+  let ty = view.h * 0.41;
+  // painel de fundo da tabela
+  const rowH0 = Math.min(24, view.h * 0.045);
+  c.fillStyle = 'rgba(13,20,15,0.88)';
+  roundRect(c, cx - tw2 / 2 - 16, ty - 20, tw2 + 32, rowH0 * 5 + 46, 14); c.fill();
+  c.lineWidth = 2; c.strokeStyle = 'rgba(255,211,92,0.35)';
+  roundRect(c, cx - tw2 / 2 - 16, ty - 20, tw2 + 32, rowH0 * 5 + 46, 14); c.stroke();
+  c.font = `800 ${Math.min(11.5, view.h * 0.022)}px ${FONT}`;
+  c.fillStyle = 'rgba(170,190,170,0.8)';
+  c.textAlign = 'left'; c.fillText('HERÓI', colN, ty);
+  c.textAlign = 'center';
+  c.fillText('K/D/A', col(0.47), ty); c.fillText('DANO', col(0.63), ty);
+  c.fillText('CURA', col(0.77), ty); c.fillText('FARM', col(0.9), ty);
+  ty += 8;
+  const rowH = Math.min(24, view.h * 0.045);
+  for (const h of st.heroes) {
+    ty += rowH;
+    if (h === mvp) {
+      c.globalAlpha = 0.16; c.fillStyle = GOLD;
+      roundRect(c, cx - tw2 / 2, ty - rowH * 0.68, tw2, rowH * 0.94, 7); c.fill();
+      c.globalAlpha = 1;
+      drawCrown(c, colN + 6, ty - 5, 6.5);
+    }
+    const cfg = M.BAL.heroes[h.hero];
+    const isYou = st.playerIndex >= 0 && h.id === st.heroes[st.playerIndex].id;
+    c.font = `800 ${Math.min(13, rowH * 0.56)}px ${FONT}`;
+    c.textAlign = 'left';
+    c.fillStyle = TEAM_LIGHT[h.team];
+    c.fillText(cfg.name + (isYou ? ' (você)' : '') + (h === mvp ? '  · MVP' : ''),
+               colN + (h === mvp ? 18 : 0), ty);
+    c.textAlign = 'center';
+    c.fillStyle = '#eef4ea';
+    c.fillText(`${h.kills}/${h.deaths}/${h.assists}`, col(0.47), ty);
+    c.fillText(String(Math.round(h.dmgDealt)), col(0.63), ty);
+    c.fillText(h.healDone > 0 ? String(Math.round(h.healDone)) : '—', col(0.77), ty);
+    c.fillText(String(h.minionKills), col(0.9), ty);
+  }
+  ty += rowH + 6;
   const t0d = st.towers.filter(t => t.team === 1 && !t.alive).length;
   const t1d = st.towers.filter(t => t.team === 0 && !t.alive).length;
-  const lines = [
-    `Abates:  ${st.teamKills[0]}  ×  ${st.teamKills[1]}`,
-    `Torres derrubadas:  ${t0d}  ×  ${t1d}`,
-    `Você (${M.BAL.heroes[p.hero].name}):  ${p.kills} / ${p.deaths} / ${p.assists}  —  nível ${p.level}`,
-    `Duração:  ${fmtTime(st.time)}`,
-  ];
-  c.font = `700 15px ${FONT}`;
-  let ly = view.h * 0.44;
-  for (const l of lines) { c.fillStyle = '#eef4ea'; c.fillText(l, cx, ly); ly += 27; }
+  c.font = `700 ${Math.min(13, rowH * 0.56)}px ${FONT}`;
+  c.fillStyle = 'rgba(220,232,215,0.9)';
+  c.fillText(`Torres: ${t0d} × ${t1d}    ·    Duração: ${fmtTime(st.time)}`, cx, ty);
 
-  const bw = Math.min(230, view.w * 0.3), bh = 52, gap = 18;
+  const bw = Math.min(230, view.w * 0.3), bh = Math.min(52, view.h * 0.12), gap = 18;
   const rects = {};
-  const bx = cx - bw - gap / 2, by2 = view.h * 0.72;
+  const bx = cx - bw - gap / 2, by2 = Math.max(view.h * 0.72, ty + 16);
   c.fillStyle = 'rgba(15,22,14,0.8)';
   roundRect(c, bx, by2 + 4, bw, bh, 15); c.fill();
   const bg1 = c.createLinearGradient(0, by2, 0, by2 + bh);
@@ -1204,6 +1483,6 @@ function renderRotateHint() {
   c.fillText('O jogo é em paisagem (horizontal)', view.w / 2, view.h / 2 + 22);
 }
 
-M.renderer = { init, resize, render, renderMenu, renderResult, renderRotateHint,
+M.renderer = { init, resize, render, renderMenu, renderIntro, renderResult, renderRotateHint,
                get view() { return R.view; } };
 })();
