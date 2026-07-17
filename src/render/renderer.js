@@ -547,6 +547,31 @@ function drawHud(c, st, opts, now) {
     }
   }
 
+  // botão de mudo (tecla M ou toque)
+  if (M.audio) {
+    const mb = M.audio.btn;
+    mb.x = view.w - 26; mb.y = 26; mb.r = 15;
+    c.globalAlpha = 0.75;
+    c.fillStyle = 'rgba(10,14,26,0.72)';
+    c.beginPath(); c.arc(mb.x, mb.y, mb.r, 0, Math.PI * 2); c.fill();
+    c.fillStyle = M.audio.muted ? 'rgba(150,156,175,0.9)' : '#e8eaf0';
+    c.beginPath();                                   // corpo do alto-falante
+    c.moveTo(mb.x - 7, mb.y - 3); c.lineTo(mb.x - 3, mb.y - 3);
+    c.lineTo(mb.x + 2, mb.y - 7.5); c.lineTo(mb.x + 2, mb.y + 7.5);
+    c.lineTo(mb.x - 3, mb.y + 3); c.lineTo(mb.x - 7, mb.y + 3);
+    c.closePath(); c.fill();
+    c.lineWidth = 2;
+    if (M.audio.muted) {                             // riscado
+      c.strokeStyle = '#ff5b5b';
+      c.beginPath(); c.moveTo(mb.x - 9, mb.y + 9); c.lineTo(mb.x + 9, mb.y - 9); c.stroke();
+    } else {                                         // ondas de som
+      c.strokeStyle = '#e8eaf0';
+      c.beginPath(); c.arc(mb.x + 4, mb.y, 5.5, -0.9, 0.9); c.stroke();
+      c.beginPath(); c.arc(mb.x + 4, mb.y, 9, -0.8, 0.8); c.stroke();
+    }
+    c.globalAlpha = 1;
+  }
+
   if (!player) return;
 
   // botões AA/Q/R (§11)

@@ -54,8 +54,11 @@ Cada linha: a decisão e a justificativa em uma linha.
 - **Aliado escolhido automaticamente** (Sol para qualquer pick; Lyra se o jogador pegar Sol) e
   dupla inimiga sorteada: tela de seleção enxuta (§3); duplas inimigas podem repetir heróis do
   time azul, nunca dentro do próprio time.
-- **Sem áudio na v1**: explicitamente opcional na spec (§3); a arquitetura de eventos já emite
-  tudo que um futuro `audio.js` precisaria consumir.
+- **Áudio 100% sintético via WebAudio** (`src/render/audio.js`, adicionado a pedido do usuário):
+  osciladores + ruído filtrado, zero arquivos externos; consome os mesmos eventos da sim que o
+  `effects.js`. Rate-limit por tipo de som + compressor no master p/ teamfight não virar ruído;
+  destrava no primeiro gesto (regra dos navegadores); mudo pela tecla M ou botão no HUD,
+  persistido em `localStorage`.
 - **`navigator.vibrate`** só em abate/morte do jogador (suporte varia; falha silenciosa).
 
 ## Processo

@@ -82,6 +82,7 @@ function loop(now) {
       const cmd = M.controls.getCommand(APP.st, player);
       M.step(APP.st, cmd);
       M.fx.ingest(APP.st, APP.st.events);
+      M.audio.ingest(APP.st, APP.st.events);
       APP.st.events.length = 0;
       APP.acc -= STEP; steps++;
       const hs = M.fx.consumeHitstop();
@@ -89,6 +90,7 @@ function loop(now) {
     }
 
     M.fx.update(dtms / 1000, APP.st);
+    M.audio.update(APP.st);
     M.renderer.render(APP.st, Math.min(1, APP.acc / STEP), {
       playerTeam: 0,
       aimPreview: M.controls.aimPreview,
@@ -111,6 +113,7 @@ function boot() {
   const canvas = document.getElementById('game');
   M.renderer.init(canvas);
   M.controls.init(canvas);
+  M.audio.init(canvas);
   M.controls.tapCb = (x, y) => { if (APP.screen !== 'game') onTap(x, y); };
   APP.last = performance.now();
   requestAnimationFrame(loop);

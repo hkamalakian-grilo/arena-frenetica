@@ -20,8 +20,13 @@ moderno (Chrome, Edge, Firefox), inclusive no celular (paisagem/horizontal).
 | Mover | joystick no lado esquerdo (aparece onde tocar) | WASD ou setas |
 | Atacar | segurar botão **AA** | botão esquerdo do mouse ou espaço |
 | Q / R | **tap** = lança no alvo mais próximo · **segurar e arrastar** = mira manual (arraste de volta ao botão p/ cancelar) | Q / R lançam na direção do mouse |
+| Som liga/desliga | alto-falante no canto superior direito | tecla **M** (ou o alto-falante) |
 
 Entrar num **bush** (moita) esconde você dos inimigos até atacar ou até um inimigo entrar junto.
+
+O jogo tem **efeitos sonoros sintéticos** (golpes, habilidades, abates, torres, dragão) gerados
+em tempo real via WebAudio — sem arquivos de áudio. O som destrava no primeiro toque/tecla
+(regra dos navegadores) e a preferência de mudo fica salva entre partidas.
 
 ### Heróis
 

@@ -50,6 +50,12 @@ function onDown(ev) {
   const p = pos(ev);
   if (C.tapCb) { C.tapCb(p.x, p.y); }
   if (!C.enabled) return;
+  // botão de mudo (canto superior direito do HUD)
+  const ab = M.audio && M.audio.btn;
+  if (ab && ab.r > 0 && V.len(p.x - ab.x, p.y - ab.y) <= ab.r * 1.5) {
+    M.audio.toggleMute();
+    return;
+  }
   const L = layout();
   for (const slot of ['aa', 'q', 'r']) {
     const b = L[slot];
