@@ -37,7 +37,9 @@ function layout() {
 }
 
 function toWorld(px, py) {
-  return { x: (px - C.view.offX) / C.view.scale, y: (py - C.view.offY) / C.view.scale };
+  // desfaz a projeção inclinada (o chão é achatado verticalmente no render)
+  const t = C.view.tilt || 1;
+  return { x: (px - C.view.offX) / C.view.scale, y: (py - C.view.offY) / C.view.scale / t };
 }
 
 function pos(ev) {
@@ -97,8 +99,10 @@ function onUp(ev) {
       C.queued.push({ slot: hd.slot, quick: true });          // tap = quick cast (§11)
     } else if (hd.aiming) {
       if (V.len(p.x - b.x, p.y - b.y) <= b.r * 1.15) continue; // voltou pro botão = cancela
-      const dir = V.norm(p.x - b.x, p.y - b.y);                // direção da mira
-      const dist = (V.len(p.x - b.x, p.y - b.y) - b.r) / C.view.scale * 3.2;
+      const tilt = C.view.tilt || 1;
+      const dyW = (p.y - b.y) / tilt;                          // mira em coords de MUNDO
+      const dir = V.norm(p.x - b.x, dyW);
+      const dist = (V.len(p.x - b.x, dyW) - b.r) / C.view.scale * 3.2;
       C.queued.push({ slot: hd.slot, quick: false, dir, dist: Math.max(60, dist) });
     }
   }
@@ -140,7 +144,9 @@ function getCommand(st, hero) {
     const l = V.len(vx, vy);
     if (l > dz) {
       const f = Math.min(1, (l - dz) / (1 - dz)) / (l || 1);
-      cmd.move.x = vx * f; cmd.move.y = vy * f;
+      // compensa a inclinação: a direção do polegar bate com a da TELA
+      const mv = V.clampLen(vx * f, vy * f / (C.view.tilt || 1), 1);
+      cmd.move.x = mv.x; cmd.move.y = mv.y;
     }
   } else {
     let x = 0, y = 0;
@@ -170,8 +176,10 @@ function getCommand(st, hero) {
     if (hd.slot === 'aa' || !hd.aiming) continue;
     const L = layout();
     const b = L[hd.slot];
-    const dir = V.norm(hd.x - b.x, hd.y - b.y);
-    const dist = Math.max(60, (V.len(hd.x - b.x, hd.y - b.y) - b.r) / C.view.scale * 3.2);
+    const tilt = C.view.tilt || 1;
+    const dyW = (hd.y - b.y) / tilt;
+    const dir = V.norm(hd.x - b.x, dyW);
+    const dist = Math.max(60, (V.len(hd.x - b.x, dyW) - b.r) / C.view.scale * 3.2);
     const cancel = V.len(hd.x - b.x, hd.y - b.y) <= b.r * 1.15;
     C.aimPreview = { slot: hd.slot, dir, dist, cancel };
   }

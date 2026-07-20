@@ -73,6 +73,14 @@ Cada linha: a decisão e a justificativa em uma linha.
   bandeirinha tremulando, bases como castelinhos, pit rochoso com brasas, HUD com molduras
   douradas. Continua 100% desenhado por código no Canvas (sem sprites, §13) e mexeu SÓ na camada
   de render — a simulação não mudou em nada.
+- **Projeção inclinada 2.5D** (pedido do usuário, ref. Brawl Stars): a câmera olha o campo de
+  cima e por trás — o CHÃO é achatado verticalmente (`TILT = 0.8`; círculos de alcance/zonas
+  viram elipses), objetos têm ALTURA subindo da própria sombra (paredes extrudadas com face
+  frontal, torres-cilindro, castelos com alicerce, unidades com os pés na sombra) e o desenho é
+  ordenado por profundidade (painter: quem está mais ao sul cobre quem está atrás — herói atrás
+  de rocha fica escondido pela pedra). A inclinação é pelo eixo VERTICAL para manter a simetria
+  azul/vermelho perfeita. Entrada compensa a projeção (mira do mouse/arrasto e joystick divididos
+  pelo tilt) — a simulação continua 2D pura e intocada; é 100% câmera.
 
 - **Hitstop congela a simulação, não o render** (40ms): partículas e HUD continuam vivos, o
   impacto "morde" sem a tela travar.

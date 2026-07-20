@@ -1,7 +1,8 @@
 # Arena Frenética — mini-MOBA 2v2
 
 Protótipo jogável de MOBA 2v2 mobile-first no browser: **3 minutos** de partida + até 2 de morte
-súbita, mapa 100% visível (sem câmera), kits enxutos (ataque + Q + ultimate) e ritmo frenético.
+súbita, mapa 100% visível (sem câmera de rolagem), **visão inclinada 2.5D** estilo Brawl Stars
+(objetos com altura e profundidade), kits enxutos (ataque + Q + ultimate) e ritmo frenético.
 
 ## Como jogar
 
