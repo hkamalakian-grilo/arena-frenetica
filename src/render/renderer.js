@@ -17,6 +17,7 @@ const WALL_H = 30;         // altura das paredes/rochas
 const TOWER_H = 34;        // altura do tambor das torres
 const BASE_LIFT = 26;      // elevação do castelinho
 const PROJ_Z = 24;         // altura de voo dos projéteis
+const SPRITE_SCALE = 3.9;  // altura da arte do herói = raio × isto
 
 // ---- paleta ----
 const TEAM = ['#3f8efc', '#ff5757'];
@@ -35,13 +36,64 @@ const R = {
   canvas: null, ctx: null,
   view: { scale: 1, offX: 0, offY: 0, w: 0, h: 0, dpr: 1, tilt: TILT },
   staticCv: null, staticMapId: null,
+  sprites: {},   // hero id -> { img, ready, ar (w/h) }
 };
+
+// carrega as artes dos heróis (assets/heroes/<id>.png); se faltar, o render cai
+// de volta na forma desenhada por código (os dois modos convivem)
+function loadHeroSprites() {
+  for (const id of Object.keys(M.BAL.heroes)) {
+    const s = { img: new Image(), ready: false, ar: 1 };
+    s.img.onload = () => { s.ready = true; s.ar = s.img.naturalWidth / s.img.naturalHeight; };
+    s.img.onerror = () => { s.ready = false; };
+    s.img.src = 'assets/heroes/' + id + '.png';
+    R.sprites[id] = s;
+  }
+}
 
 function init(canvas) {
   R.canvas = canvas;
   R.ctx = canvas.getContext('2d');
+  loadHeroSprites();
   resize();
   window.addEventListener('resize', resize);
+}
+
+/**
+ * Desenha um herói: usa a ARTE (sprite) se carregada, senão a forma por código.
+ * (cx,cy) é o ponto no chão (os "pés"); a arte sobe a partir daí. `faceLeft`
+ * espelha horizontalmente. `bodyH` é a altura-alvo em pixels.
+ */
+function drawHeroArt(c, heroId, cx, cy, bodyH, opts) {
+  const o = opts || {};
+  const spr = R.sprites[heroId];
+  if (spr && spr.ready) {
+    const H = bodyH, Wd = H * spr.ar;
+    const puff = o.puff || 1;
+    c.save();
+    if (o.glow) { c.shadowColor = 'rgba(255,255,255,0.9)'; c.shadowBlur = 16; }
+    c.globalAlpha = o.alpha !== undefined ? o.alpha : 1;
+    // âncora nos pés: centro-x = cx, base = cy
+    c.translate(cx, cy - H * 0.5);
+    c.scale((o.faceLeft ? -1 : 1) * puff, 2 - puff);
+    c.drawImage(spr.img, -Wd / 2, -H / 2, Wd, H);
+    c.restore();
+    return { topY: cy - H, cxV: cx };
+  }
+  // fallback: forma por código (mesma assinatura antiga, centrada em (cx, cy - r*1.4))
+  const cfg = M.BAL.heroes[heroId];
+  const r = o.r || bodyH * 0.24;
+  const yc = cy - r * 1.15;
+  c.save();
+  if (o.glow) { c.shadowColor = '#ffffff'; c.shadowBlur = 16; }
+  c.translate(cx, yc);
+  const p = o.puff || 1;
+  c.scale(p, 2 - p > 0 ? (2 - p) * 0.5 + 0.5 : 1);
+  drawHeroBody(c, cfg, 0, 0, r, o.facing || { x: 1, y: 0 }, o.team !== undefined ? o.team : -1,
+               { id: o.id || 0, now: o.now || 0, alpha: o.alpha, kind: heroId,
+                 atkK: o.atkK || 0, chargeK: o.chargeK });
+  c.restore();
+  return { topY: yc - r, cxV: cx };
 }
 
 function resize() {
@@ -767,54 +819,54 @@ function render(st, alpha, opts) {
       const bob = moving ? Math.abs(Math.sin(now * 10 + h.id * 1.7)) * 3 : 0;
       const atkK = Math.max(0, (h.aaCd / (cfg.aa.period || 1)) - 0.8) / 0.2;
       const puff = 1 + atkK * 0.12;
+      const bodyH = h.radius * SPRITE_SCALE;
+      const footY = gY(p.y) + h.radius * 0.16 - bob;   // "pés" no chão (com o pulinho)
       c.globalAlpha = inBushAlly ? 0.55 : 1;
-      const py = gY(p.y) - h.radius * 0.7 - bob;
 
-      if (isPlayer && h.bushIdx >= 0 && !h.visTo[1 - pt]) {
+      if (isPlayer && h.bushIdx >= 0 && !h.visTo[1 - pt]) {   // "estou oculto" (§12)
         c.globalAlpha = 0.55 + 0.25 * Math.sin(now * 5);
         c.lineWidth = 3.5; c.strokeStyle = '#eaffcf';
         c.setLineDash([7, 6]);
-        c.beginPath(); c.arc(p.x, py, h.radius + 11, 0, Math.PI * 2); c.stroke();
+        c.beginPath(); c.ellipse(p.x, footY, h.radius + 15, (h.radius + 15) * 0.48, 0, 0, Math.PI * 2); c.stroke();
         c.setLineDash([]);
         c.globalAlpha = inBushAlly ? 0.55 : 1;
       }
       if (h.invulnT > 0) {
         c.lineWidth = 3; c.strokeStyle = 'rgba(255,255,255,0.85)';
-        c.beginPath(); c.arc(p.x, py, h.radius + 7, 0, Math.PI * 2); c.stroke();
+        c.beginPath(); c.ellipse(p.x, footY, h.radius + 11, (h.radius + 11) * 0.48, 0, 0, Math.PI * 2); c.stroke();
       }
-      if (isPlayer) { c.save(); c.shadowColor = '#ffffff'; c.shadowBlur = 16; }
-      c.save();
-      c.translate(p.x, py); c.scale(puff, 2 - puff > 0 ? (2 - puff) * 0.5 + 0.5 : 1);
-      drawHeroBody(c, cfg, 0, 0, h.radius, h.facing, h.team,
-                   { id: h.id, now, alpha: inBushAlly ? 0.55 : 1, kind: h.hero, atkK,
-                     chargeK: 1 - Math.min(1, h.aaCd / (cfg.aa.period || 1)) });
-      c.restore();
-      if (isPlayer) c.restore();
+
+      const art = drawHeroArt(c, h.hero, p.x, footY, bodyH, {
+        faceLeft: h.facing.x < -0.12, puff, glow: isPlayer,
+        alpha: inBushAlly ? 0.55 : 1, id: h.id, now, atkK, facing: h.facing,
+        team: h.team, chargeK: 1 - Math.min(1, h.aaCd / (cfg.aa.period || 1)) });
+      const headY = art.topY + bodyH * 0.06;
 
       if (h.stunT > 0) {
         for (let i = 0; i < 3; i++) {
           const a = now * 6 + i * Math.PI * 2 / 3;
           c.fillStyle = GOLD;
-          c.beginPath(); c.arc(p.x + Math.cos(a) * h.radius * 0.9, py - h.radius - 8 + Math.sin(a) * 4, 3, 0, Math.PI * 2); c.fill();
+          c.beginPath(); c.arc(p.x + Math.cos(a) * h.radius * 0.9, headY - 6 + Math.sin(a) * 4, 3, 0, Math.PI * 2); c.fill();
         }
       }
       if (h.slowT > 0) {
         c.globalAlpha = 0.6; c.fillStyle = '#7ecbff';
-        c.beginPath(); c.arc(p.x, py + h.radius + 6, 4.5, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.arc(p.x, footY + 4, 4.5, 0, Math.PI * 2); c.fill();
         c.globalAlpha = inBushAlly ? 0.55 : 1;
       }
       if (st.dragonBuffT[h.team] > 0) {
         c.globalAlpha = 0.85; c.fillStyle = '#ff9f43';
-        c.beginPath(); c.arc(p.x - h.radius - 6, py - h.radius - 6, 5, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.arc(p.x - h.radius - 6, headY - 2, 5, 0, Math.PI * 2); c.fill();
         c.fillStyle = '#ffd35c';
-        c.beginPath(); c.arc(p.x - h.radius - 6, py - h.radius - 7.5, 2.4, 0, Math.PI * 2); c.fill();
+        c.beginPath(); c.arc(p.x - h.radius - 6, headY - 3.5, 2.4, 0, Math.PI * 2); c.fill();
         c.globalAlpha = inBushAlly ? 0.55 : 1;
       }
 
       const bw = 52;
-      pill(c, p.x, py - h.radius - 19, bw, 6.5, h.hp / h.maxHp,
+      const barY = headY - 14;
+      pill(c, p.x, barY, bw, 6.5, h.hp / h.maxHp,
            h.team === pt ? '#43d17c' : TEAM[1]);
-      const lx = p.x + bw / 2 + 10, ly = py - h.radius - 15.5;
+      const lx = p.x + bw / 2 + 10, ly = barY + 3.5;
       c.fillStyle = INK;
       c.beginPath(); c.arc(lx, ly, 10, 0, Math.PI * 2); c.fill();
       c.fillStyle = h.team === pt ? TEAM[0] : TEAM[1];
@@ -1223,8 +1275,7 @@ function renderMenu(menu) {
     const sel = menu.hero === id;
     card(x, y0, cw, ch, sel);
     const bounce = sel ? Math.sin(now * 5) * 2 : 0;
-    drawHeroBody(c, cfg, x + cw / 2, y0 + ch * 0.37 + bounce, Math.min(18, ch * 0.19),
-                 { x: 1, y: 0 }, -1, { id: i * 7, now, kind: id });
+    drawHeroArt(c, id, x + cw / 2, y0 + ch * 0.66 + bounce, ch * 0.6, { id: i * 7, now });
     c.fillStyle = '#ffffff';
     c.font = `900 ${Math.min(13.5, ch * 0.14)}px ${FONT}`;
     c.fillText(cfg.name, x + cw / 2, y0 + ch * 0.74);
@@ -1243,8 +1294,7 @@ function renderMenu(menu) {
     const x = x0a + i * (aw + gap);
     const sel = menu.ally === id;
     card(x, y1, aw, ah, sel);
-    drawHeroBody(c, cfg, x + aw / 2, y1 + ah * 0.42, Math.min(13, ah * 0.2),
-                 { x: 1, y: 0 }, 0, { id: 40 + i, now, kind: id });
+    drawHeroArt(c, id, x + aw / 2, y1 + ah * 0.7, ah * 0.6, { id: 40 + i, now, team: 0 });
     c.fillStyle = '#ffffff';
     c.font = `800 ${Math.min(11.5, ah * 0.17)}px ${FONT}`;
     c.fillText(cfg.name, x + aw / 2, y1 + ah * 0.87);
@@ -1345,9 +1395,9 @@ function renderIntro(st, t) {
       const cfg = M.BAL.heroes[h.hero];
       const hx = P.x + pw * (k === 0 ? 0.3 : 0.7), hy = py + ph * 0.52;
       const rr = Math.min(25, ph * 0.18);
-      drawHeroBody(c, cfg, hx, hy + Math.sin(now * 3 + hi) * 2, rr,
-                   { x: P.team === 0 ? 1 : -1, y: 0 }, P.team,
-                   { id: hi, now, kind: h.hero });
+      drawHeroArt(c, h.hero, hx, hy + ph * 0.22 + Math.sin(now * 3 + hi) * 2, ph * 0.42,
+                  { id: hi, now, team: P.team, faceLeft: P.team === 1,
+                    facing: { x: P.team === 0 ? 1 : -1, y: 0 } });
       c.font = `800 ${Math.min(12.5, ph * 0.1)}px ${FONT}`;
       c.fillStyle = '#ffffff';
       c.fillText(cfg.name, hx, py + ph * 0.88);

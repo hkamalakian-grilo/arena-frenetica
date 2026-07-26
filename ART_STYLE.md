@@ -48,10 +48,14 @@ Herói 1.0x · Torre 3.0x · Dragão 6.0x · Árvore 2.5x · Ponte 2.5x · Arbus
 ## 5. Lista de assets (checklist)
 
 ### Heróis (virados à direita, 3/4)
-- [ ] Brutus — tanque, armadura laranja/dourada, elmo com pluma, escudo redondo
-- [ ] Lyra — atiradora, capuz/roupa verde, arco de madeira, aljava
-- [ ] Nix — assassino, capuz roxo escuro sobre os olhos, duas adagas
-- [ ] Sol — suporte/maga, manto amarelo/dourado, auréola brilhante
+- [x] Brutus — tanque, armadura laranja/dourada, elmo com pluma, escudo redondo ✅ no jogo
+- [x] Lyra — atiradora, capuz/roupa verde, arco de madeira, aljava ✅ no jogo
+- [x] Nix — assassino, capuz roxo escuro sobre os olhos, duas adagas ✅ no jogo
+- [x] Sol — suporte/maga, manto amarelo/dourado, auréola brilhante ✅ no jogo
+
+> Integrados via `assets/heroes/<id>.png` (fundo recortado). Fonte crua em `Art GPT/`.
+> O render usa a arte e mantém sombra, anel de time, barra, nível e animação por código;
+> se um PNG faltar, cai de volta na forma desenhada. Espelha conforme a direção do herói.
 
 ### Construções (3/4, em pé)
 - [ ] Torre azul · [ ] Torre vermelha (torre de pedra + cúpula/bandeira do time)
