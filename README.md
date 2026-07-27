@@ -7,7 +7,17 @@ súbita, mapa 100% visível (sem câmera de rolagem), **visão inclinada 2.5D** 
 ## Como jogar
 
 **Dê dois cliques em `index.html`.** Não precisa instalar nada — funciona em qualquer navegador
-moderno (Chrome, Edge, Firefox), inclusive no celular (paisagem/horizontal).
+moderno (Chrome, Edge, Firefox), inclusive no celular.
+
+### No celular, como um app (tela cheia, offline)
+
+O jogo é um **PWA**: abra o link publicado (Netlify) no celular e instale na tela de início —
+ele passa a abrir **sem barra de navegador**, com ícone próprio, e **funciona sem internet**.
+
+- **Android (Chrome)**: menu ⋮ → *Instalar aplicativo* / *Adicionar à tela inicial*.
+- **iPhone (Safari)**: botão Compartilhar → *Adicionar à Tela de Início*.
+- Jogando pelo navegador mesmo (sem instalar), tocar em **JOGAR** já entra em tela cheia
+  no Android; no iPhone o caminho é instalar.
 
 1. Escolha o seu herói, o **parceiro** (bot), o mapa e a **dificuldade** (Fácil/Normal/Difícil,
    vale só para os inimigos) e toque **JOGAR** — as duplas se apresentam e a contagem 3-2-1-LUTE!

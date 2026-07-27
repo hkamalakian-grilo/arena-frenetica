@@ -80,6 +80,23 @@ Cada linha: a decisão e a justificativa em uma linha.
   no C (2:51 de média, 13% de morte súbita, dragão 100% contestado, zero travadas) e Mapa B
   re-verificado sem regressão.
 
+## App instalável (PWA) — pedido do usuário: "jogar em tela cheia no celular"
+
+- **PWA em vez de Capacitor/loja** (decisão discutida): `manifest.json` + `sw.js` dão ícone na
+  tela de início, abertura **sem barra de navegador** e jogo **offline**, sem Node, sem Android
+  Studio/Xcode, sem custo de loja. O caminho Capacitor continua aberto no futuro (o jogo é web
+  estático) e nada aqui o atrapalha.
+- **`display: "fullscreen"`** com fallback `standalone`; **`orientation: "any"`** de propósito —
+  temos mapas deitados (A/B) e em pé (C), então travar orientação quebraria metade do jogo.
+- **Tela cheia também sem instalar**: `requestFullscreen()` disparado no toque em JOGAR (precisa
+  de gesto do usuário); falha silenciosa no iPhone, onde o caminho é instalar.
+- **Estratégia de cache**: código = rede primeiro (atualização publicada aparece na hora, sem o
+  clássico "atualizei e continua velho"), imagens = cache primeiro. Ao publicar, subir `CACHE`
+  em `sw.js` é opcional mas recomendado.
+- **`file://` preservado**: o service worker só é registrado em http(s), então abrir o
+  `index.html` com 2 cliques continua funcionando igual.
+- **Ícones** gerados por script a partir da arte do Brutus (192/512/maskable/apple-180/favicon).
+
 ## Apresentação / controles
 
 - **Direção de arte "toy/cartoon"** (pedido do usuário, referência Clash Royale): arena clara de

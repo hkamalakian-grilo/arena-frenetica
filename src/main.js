@@ -48,13 +48,25 @@ function startMatch() {
 
 function inRect(r, x, y) { return r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h; }
 
+// tela cheia de verdade ao começar a partida (precisa de gesto do usuário).
+// Falha silenciosa onde não há suporte (ex.: Safari no iPhone — lá o caminho
+// é instalar na tela de início, que já abre sem barra).
+function tryFullscreen() {
+  try {
+    const el = document.documentElement;
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) { const p = req.call(el, { navigationUI: 'hide' }); if (p && p.catch) p.catch(() => {}); }
+  } catch (e) { /* sem suporte: segue normal */ }
+}
+
 function onTap(x, y) {
   if (APP.screen === 'menu' && APP.menuRects) {
     for (const h of APP.menuRects.heroes) if (inRect(h, x, y)) { APP.menu.hero = h.id; return; }
     for (const a of APP.menuRects.allies) if (inRect(a, x, y)) { APP.menu.ally = a.id; return; }
     for (const m of APP.menuRects.maps) if (inRect(m, x, y)) { APP.menu.map = m.id; return; }
     for (const d of APP.menuRects.diffs) if (inRect(d, x, y)) { APP.menu.difficulty = d.id; return; }
-    if (inRect(APP.menuRects.start, x, y)) startMatch();
+    if (inRect(APP.menuRects.start, x, y)) { tryFullscreen(); startMatch(); }
   } else if (APP.screen === 'result' && APP.resultRects) {
     if (inRect(APP.resultRects.rematch, x, y)) startMatch();
     else if (inRect(APP.resultRects.menu, x, y)) { APP.screen = 'menu'; APP.st = null; }

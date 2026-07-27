@@ -1,0 +1,19 @@
+{
+  "name": "Arena Frenética — mini-MOBA 2v2",
+  "short_name": "Arena Frenética",
+  "description": "MOBA 2v2 de partidas curtas: 3 minutos, zero downtime.",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#0d1811",
+  "theme_color": "#0d1811",
+  "categories": ["games"],
+  "icons": [
+    { "src": "assets/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "assets/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
