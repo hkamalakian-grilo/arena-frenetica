@@ -58,23 +58,26 @@ Herói 1.0x · Torre 3.0x · Dragão 6.0x · Árvore 2.5x · Ponte 2.5x · Arbus
 > se um PNG faltar, cai de volta na forma desenhada. Espelha conforme a direção do herói.
 
 ### Construções (3/4, em pé)
-- [ ] Torre azul · [ ] Torre vermelha (torre de pedra + cúpula/bandeira do time)
-- [ ] Base azul · [ ] Base vermelha (castelo/fortaleza com bandeira do time)
-- [ ] Dragão (laranja, chifres, asas — 3/4 de cima)
-- [ ] Altar/pit do dragão (cratera rochosa com brasa/ovo no centro — peça de chão)
+- [x] Torre azul · [x] Torre vermelha ✅ no jogo (Mapa C)
+- [x] Base azul · [x] Base vermelha ✅ no jogo (Mapa C)
+- [x] Dragão ✅ no jogo (Mapa C)
+- [x] Altar/pit do dragão (foço com ovo de lava) ✅ no jogo (Mapa C)
 
 ### Chão (top-down PLANO, tileável)
-- [ ] Grama · [ ] Terra (caminho) · [ ] Pedra · [ ] Água (opcional)
+- [x] Grama · [x] Terra · [x] Pedra (topo das rochas) ✅ no jogo (Mapa C) · [ ] Água (opcional)
 
 ### Enfeites (3/4, em pé)
-- [ ] Árvore · [ ] Arbusto (moita) · [ ] Rochas grandes (parede) · [ ] Rochas pequenas
-- [ ] Flores · [ ] Ponte (opcional)
+- [x] Árvore · [x] Arbusto (moita) · [x] Flores ✅ no jogo (Mapa C)
+- [ ] Rochas soltas (opcional) · [ ] Ponte pintada (hoje é desenhada por código)
 
-### Ícones de habilidade (frontal, circular, símbolo chapado)
-- [ ] Brutus Q Investida · [ ] Brutus R Terremoto
-- [ ] Lyra Q Flecha Perfurante · [ ] Lyra R Chuva de Flechas
-- [ ] Nix Q Passo Sombrio · [ ] Nix R Execução
-- [ ] Sol Q Orbe Solar · [ ] Sol R Zona Radiante
+### Ícones de habilidade (frontal, circular, símbolo chapado) — GLOBAIS (todos os mapas)
+- [x] Ataque Básico · [x] Investida · [x] Terremoto ✅ nos botões
+- [x] Flecha Perfurante · [x] Chuva de Flechas ✅
+- [x] Passo Sombrio · [ ] **Execução (FALTA — R do Nix usa a letra por enquanto)**
+- [x] Orbe Solar · [x] Zona Radiante ✅
+
+> **Tema por mapa**: as artes de mapa valem onde `artTheme: true` (hoje só o Mapa C).
+> A/B seguem com o desenho por código até decidirmos vesti-los também.
 
 ### VFX — **feitos por código**, não gerar (fogo, gelo, raio, cura, escudo, explosão…)
 

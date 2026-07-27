@@ -52,10 +52,60 @@ function loadHeroSprites() {
   }
 }
 
+// artes do tema pintado (mapas com artTheme) + ícones de habilidade (globais).
+// Mesma regra: faltou arquivo → cai no desenho por código, nada quebra.
+const ART_FILES = {
+  tower_blue: 'assets/structures/tower_blue.png',
+  tower_red: 'assets/structures/tower_red.png',
+  base_blue: 'assets/structures/base_blue.png',
+  base_red: 'assets/structures/base_red.png',
+  dragon: 'assets/dragon/dragon.png',
+  pit: 'assets/dragon/pit.png',
+  tree: 'assets/decor/tree.png',
+  bush: 'assets/decor/bush.png',
+  flowers: 'assets/decor/flowers.png',
+  tex_grass: 'assets/textures/grass.png',
+  tex_dirt: 'assets/textures/dirt.png',
+  tex_stone: 'assets/textures/stone.png',
+  sk_aa: 'assets/skills/aa.png',
+  sk_investida: 'assets/skills/investida.png',
+  sk_terremoto: 'assets/skills/terremoto.png',
+  sk_flecha: 'assets/skills/flecha.png',
+  sk_chuva: 'assets/skills/chuva.png',
+  sk_passo: 'assets/skills/passo.png',
+  sk_orbe: 'assets/skills/orbe.png',
+  sk_zona: 'assets/skills/zona.png',
+};
+
+function loadArt() {
+  R.art = {};
+  for (const k of Object.keys(ART_FILES)) {
+    const s = { img: new Image(), ready: false, ar: 1 };
+    s.img.onload = () => {
+      s.ready = true;
+      s.ar = s.img.naturalWidth / s.img.naturalHeight;
+      if (k.startsWith('tex_') || k === 'pit') R.staticSig = null;   // repinta o chão
+    };
+    s.img.onerror = () => { s.ready = false; };
+    s.img.src = ART_FILES[k];
+    R.art[k] = s;
+  }
+}
+
+const artOk = (k) => R.art && R.art[k] && R.art[k].ready;
+
+// pattern de pedra cacheado (topo das rochas no tema pintado)
+function stonePattern(c) {
+  if (!artOk('tex_stone')) return null;
+  if (!R.stonePat) R.stonePat = c.createPattern(R.art.tex_stone.img, 'repeat');
+  return R.stonePat;
+}
+
 function init(canvas) {
   R.canvas = canvas;
   R.ctx = canvas.getContext('2d');
   loadHeroSprites();
+  loadArt();
   resize();
   window.addEventListener('resize', resize);
 }
@@ -209,8 +259,28 @@ function buildStatic(map) {
   cv.width = map.size.w; cv.height = map.size.h;
   const c = cv.getContext('2d');
 
-  drawGrass(c, map.size.w, map.size.h);
-  for (const b of map.laneBands || []) drawPath(c, b, 26);
+  const art = !!map.artTheme;
+
+  // grama: textura pintada no tema de arte; senão o xadrez desenhado
+  if (art && artOk('tex_grass')) {
+    c.fillStyle = c.createPattern(R.art.tex_grass.img, 'repeat');
+    c.fillRect(0, 0, map.size.w, map.size.h);
+  } else {
+    drawGrass(c, map.size.w, map.size.h);
+  }
+
+  // trilhas: textura de terra recortada no formato da trilha; senão o desenho
+  for (const b of map.laneBands || []) {
+    if (art && artOk('tex_dirt')) {
+      c.fillStyle = PATH_DARK;
+      roundRect(c, b.x - 4, b.y - 4, b.w + 8, b.h + 8, 30); c.fill();
+      c.save();
+      roundRect(c, b.x, b.y, b.w, b.h, 26); c.clip();
+      c.fillStyle = c.createPattern(R.art.tex_dirt.img, 'repeat');
+      c.fillRect(b.x, b.y, b.w, b.h);
+      c.restore();
+    } else drawPath(c, b, 26);
+  }
   if (map.plaza) drawPath(c, map.plaza, 34);
 
   // rio (paredes type:'water'): faixas contínuas de água, chatas no chão,
@@ -252,8 +322,10 @@ function buildStatic(map) {
   c.lineWidth = 3; c.strokeStyle = 'rgba(255,255,255,0.25)';
   c.strokeRect(14, 14, map.size.w - 28, map.size.h - 28);
 
-  // pit do dragão (cratera no chão)
+  // pit do dragão (cratera desenhada; no tema de arte o FOÇO pintado é
+  // desenhado por frame no render, então aqui não pinta nada)
   const pit = map.dragonPit;
+  if (!(art && artOk('pit'))) {
   c.fillStyle = 'rgba(35,48,66,0.3)';
   c.beginPath(); c.ellipse(pit.x + 5, pit.y + 9, pit.radius * 1.02, pit.radius * 0.92, 0, 0, Math.PI * 2); c.fill();
   c.fillStyle = '#4a423e';
@@ -274,6 +346,7 @@ function buildStatic(map) {
     c.lineWidth = 2; c.strokeStyle = 'rgba(58,66,84,0.6)';
     c.beginPath(); c.arc(sx, sy, sr, 0, Math.PI * 2); c.stroke();
   }
+  }
 
   // base dos bushes (folhagem viva é por frame; paredes agora são objetos em pé)
   for (const b of map.bushes) drawBushBase(c, b);
@@ -291,9 +364,12 @@ function buildStatic(map) {
 }
 
 function ensureStatic(map) {
-  if (R.staticMapId !== map.id) {
+  // assinatura inclui as texturas: quando uma termina de carregar, repinta
+  const sig = map.id + '|' +
+    ['tex_grass', 'tex_dirt', 'tex_stone', 'pit'].map(k => artOk(k) ? 1 : 0).join('');
+  if (R.staticSig !== sig) {
     R.staticCv = buildStatic(map);
-    R.staticMapId = map.id;
+    R.staticSig = sig;
   }
 }
 
@@ -524,7 +600,7 @@ function shadowAt(c, x, yWorld, rx, k) {
   c.beginPath(); c.ellipse(x, gY(yWorld), rx, rx * 0.34, 0, 0, Math.PI * 2); c.fill();
 }
 
-function drawWallStanding(c, w) {
+function drawWallStanding(c, w, useArt) {
   const yT = gY(w.y), hT = w.h * TILT;
   // face frontal (sul)
   c.fillStyle = STONE_DARK;
@@ -536,11 +612,22 @@ function drawWallStanding(c, w) {
     const xx = w.x + (w.w / n) * i;
     c.beginPath(); c.moveTo(xx, yT + hT - WALL_H + 5); c.lineTo(xx, yT + hT); c.stroke();
   }
-  // topo
-  c.fillStyle = STONE;
-  roundRect(c, w.x, yT - WALL_H, w.w, hT, 10); c.fill();
-  c.fillStyle = STONE_TOP;
-  roundRect(c, w.x + 4, yT - WALL_H + 4, w.w - 8, Math.max(10, hT * 0.42), 8); c.fill();
+  // topo (no tema de arte, com a textura de pedra pintada)
+  const pat = useArt ? stonePattern(c) : null;
+  if (pat) {
+    c.save();
+    roundRect(c, w.x, yT - WALL_H, w.w, hT, 10); c.clip();
+    c.fillStyle = pat;
+    c.fillRect(w.x, yT - WALL_H, w.w, hT);
+    c.fillStyle = 'rgba(255,255,255,0.12)';
+    c.fillRect(w.x, yT - WALL_H, w.w, Math.max(8, hT * 0.35));
+    c.restore();
+  } else {
+    c.fillStyle = STONE;
+    roundRect(c, w.x, yT - WALL_H, w.w, hT, 10); c.fill();
+    c.fillStyle = STONE_TOP;
+    roundRect(c, w.x + 4, yT - WALL_H + 4, w.w - 8, Math.max(10, hT * 0.42), 8); c.fill();
+  }
   c.lineWidth = 3; c.strokeStyle = 'rgba(58,66,84,0.85)';
   roundRect(c, w.x, yT - WALL_H, w.w, hT, 10); c.stroke();
 }
@@ -562,6 +649,25 @@ function drawTowerStanding(c, st, t, now) {
     return;
   }
   const attackable = M.structureAttackable(st, t);
+
+  // tema de arte: torre pintada (barra/%, cadeado e sombra continuam por código)
+  const artKey = t.team === 0 ? 'tower_blue' : 'tower_red';
+  if (st.map.artTheme && artOk(artKey)) {
+    const spr = R.art[artKey];
+    const Ht = 158, Wt = Ht * spr.ar;
+    const yBa = gY(t.pos.y) + 10;
+    c.globalAlpha = attackable ? 1 : 0.68;
+    c.drawImage(spr.img, t.pos.x - Wt / 2, yBa - Ht, Wt, Ht);
+    c.globalAlpha = 1;
+    pill(c, t.pos.x, yBa - Ht - 16, 70, 7.5, t.hp / t.maxHp, TEAM[t.team]);
+    c.font = `800 12px ${FONT}`; c.textAlign = 'center';
+    c.lineWidth = 3; c.strokeStyle = 'rgba(20,26,36,0.7)'; c.fillStyle = '#ffffff';
+    c.strokeText(Math.round(100 * t.hp / t.maxHp) + '%', t.pos.x, yBa - Ht - 22);
+    c.fillText(Math.round(100 * t.hp / t.maxHp) + '%', t.pos.x, yBa - Ht - 22);
+    if (!attackable) drawLock(c, t.pos.x, yBa - Ht - 42);
+    return;
+  }
+
   c.globalAlpha = attackable ? 1 : 0.68;
   // tambor (cilindro)
   c.fillStyle = '#8f99a8';
@@ -611,6 +717,27 @@ function drawBaseStanding(c, st, b, now) {
   const s = b.radius;
   const yB = gY(b.pos.y);
   const attackable = M.structureAttackable(st, b);
+
+  // tema de arte: castelo pintado
+  const artKey = b.team === 0 ? 'base_blue' : 'base_red';
+  if (st.map.artTheme && artOk(artKey)) {
+    const spr = R.art[artKey];
+    const Hb = 195, Wb = Hb * spr.ar;
+    const yBa = yB + 16;
+    c.globalAlpha = b.alive ? (attackable ? 1 : 0.72) : 0.38;
+    c.drawImage(spr.img, b.pos.x - Wb / 2, yBa - Hb, Wb, Hb);
+    c.globalAlpha = 1;
+    if (b.alive) {
+      pill(c, b.pos.x, yBa - Hb - 18, 92, 9, b.hp / b.maxHp, TEAM[b.team], { segments: true });
+      c.font = `800 13px ${FONT}`; c.textAlign = 'center';
+      c.lineWidth = 3; c.strokeStyle = 'rgba(20,26,36,0.7)'; c.fillStyle = '#ffffff';
+      c.strokeText(Math.round(100 * b.hp / b.maxHp) + '%', b.pos.x, yBa - Hb - 24);
+      c.fillText(Math.round(100 * b.hp / b.maxHp) + '%', b.pos.x, yBa - Hb - 24);
+      if (!attackable) drawLock(c, b.pos.x, yBa - Hb - 44);
+    }
+    return;
+  }
+
   const bob = 1 + 0.02 * Math.sin(now * 2.4 + b.team * 2);
   c.save();
   c.translate(b.pos.x, yB - BASE_LIFT);
@@ -738,6 +865,15 @@ function render(st, alpha, opts) {
   c.globalAlpha = 1;
   c.restore();   // fim do espaço do chão
 
+  // foço do dragão pintado (tema de arte): decal já em perspectiva própria
+  if (st.map.artTheme && artOk('pit')) {
+    const spr = R.art.pit;
+    const pw2 = st.map.dragonPit.radius * 2.75;
+    const ph2 = pw2 / spr.ar;
+    c.drawImage(spr.img, st.map.dragonPit.x - pw2 / 2,
+                gY(st.map.dragonPit.y) - ph2 * 0.56, pw2, ph2);
+  }
+
   // ========== PASSO 2: SOMBRAS ==========
   for (const b of st.bases) shadowAt(c, b.pos.x, b.pos.y + 14, b.radius * 1.25);
   for (const t of st.towers) if (t.alive) shadowAt(c, t.pos.x, t.pos.y + 6, t.radius * 1.15);
@@ -760,13 +896,26 @@ function render(st, alpha, opts) {
 
   for (const w of st.map.walls) {
     if (w.type === 'water') continue;   // rio é chão (desenhado na camada estática)
-    list.push({ sy: w.y + w.h, fn: () => drawWallStanding(c, w) });
+    list.push({ sy: w.y + w.h, fn: () => drawWallStanding(c, w, st.map.artTheme) });
   }
   for (const b of st.bases) {
     list.push({ sy: b.pos.y + 14, fn: () => drawBaseStanding(c, st, b, now) });
   }
   for (const t of st.towers) {
     list.push({ sy: t.pos.y + 6, fn: () => drawTowerStanding(c, st, t, now) });
+  }
+
+  // enfeites pintados do mapa (árvores, flores…) — visual, sem colisão
+  if (st.map.artTheme) {
+    for (const d0 of st.map.decor || []) {
+      const spr = R.art[d0.kind];
+      if (!spr || !spr.ready) continue;
+      list.push({ sy: d0.y, fn: () => {
+        shadowAt(c, d0.x, d0.y + 2, d0.h * 0.32, 0.2);
+        const Wd0 = d0.h * spr.ar;
+        c.drawImage(spr.img, d0.x - Wd0 / 2, gY(d0.y) - d0.h, Wd0, d0.h);
+      } });
+    }
   }
 
   if (!dg.spawned && st.time >= M.BAL.dragon.spawnAt - M.BAL.dragon.warnBefore) {
@@ -781,6 +930,16 @@ function render(st, alpha, opts) {
   if (dg.spawned && dg.alive) {
     const p = ip(dg, alpha);
     list.push({ sy: p.y + 8, fn: () => {
+      // tema de arte: dragão pintado (barra continua por código)
+      if (st.map.artTheme && artOk('dragon')) {
+        const spr = R.art.dragon;
+        const liftA = dg.radius * 0.6 + Math.sin(now * 2.6) * 4;
+        const Hd = 118, Wd2 = Hd * spr.ar;
+        const cyD = gY(p.y) - liftA;
+        c.drawImage(spr.img, p.x - Wd2 / 2, cyD - Hd * 0.62, Wd2, Hd);
+        pill(c, p.x, cyD - Hd * 0.62 - 16, 100, 8, dg.hp / dg.maxHp, '#ff9f43');
+        return;
+      }
       const lift = dg.radius * 0.7 + Math.sin(now * 2.6) * 3;
       const py = gY(p.y) - lift;
       const flap = Math.sin(now * 6) * 0.35;
@@ -961,6 +1120,17 @@ function render(st, alpha, opts) {
   for (const d of list) d.fn();
 
   // ========== PASSO 4: folhagem dos bushes (cobre os pés de quem está dentro) ==========
+  if (st.map.artTheme && artOk('bush')) {
+    // arbustos pintados: 2 por moita, por cima das unidades
+    const spr = R.art.bush;
+    for (const b of st.map.bushes) {
+      const baseY = gY(b.y + b.h);
+      const H1 = b.h * TILT + 36, W1 = H1 * spr.ar;
+      c.drawImage(spr.img, b.x + b.w * 0.32 - W1 / 2, baseY - H1 + 2, W1, H1);
+      const H2 = b.h * TILT + 24, W2 = H2 * spr.ar;
+      c.drawImage(spr.img, b.x + b.w * 0.72 - W2 / 2, baseY - H2 + 6, W2, H2);
+    }
+  } else {
   c.save(); c.scale(1, TILT);
   for (const b of st.map.bushes) {
     c.globalAlpha = 0.62;
@@ -982,6 +1152,7 @@ function render(st, alpha, opts) {
     roundRect(c, b.x, b.y, b.w, b.h, Math.min(b.w, b.h) * 0.35); c.stroke();
   }
   c.restore();
+  }
 
   // ========== PASSO 5: brasas do pit + números flutuantes ==========
   const pit = st.map.dragonPit;
@@ -1131,12 +1302,17 @@ function drawHud(c, st, opts, now) {
   if (!player) return;
 
   const L = M.controls.layout();
-  drawButton(c, L.aa, 'AA', 0, 1, '#f2f4f8', true, 0);
+  // ícones pintados por habilidade (fallback: letra, ex.: Execução do Nix)
+  const SKI = { brutus: ['investida', 'terremoto'], lyra: ['flecha', 'chuva'],
+                nix: ['passo', null], sol: ['orbe', 'zona'] };
+  const ski = SKI[player.hero] || [null, null];
+  const ic = (k) => (k && artOk('sk_' + k)) ? R.art['sk_' + k] : null;
+  drawButton(c, L.aa, 'AA', 0, 1, '#f2f4f8', true, 0, ic('aa'));
   const qCfg = M.BAL.heroes[player.hero].q, rCfg = M.BAL.heroes[player.hero].r;
-  drawButton(c, L.q, 'Q', player.qCd, qCfg.cd, '#6fc2ff', true, 0);
+  drawButton(c, L.q, 'Q', player.qCd, qCfg.cd, '#6fc2ff', true, 0, ic(ski[0]));
   const rCd = rCfg.cd * (st.phase === 'sudden' ? MB.sdUltCdFactor : 1);
   drawButton(c, L.r, 'R', player.rCd, rCd, '#c77dff', player.ultUnlocked,
-             player.ultUnlocked && player.rCd <= 0 ? now : 0);
+             player.ultUnlocked && player.rCd <= 0 ? now : 0, ic(ski[1]));
 
   const joy = M.controls.joy;
   if (joy) {
@@ -1183,7 +1359,7 @@ function drawHud(c, st, opts, now) {
   }
 }
 
-function drawButton(c, b, label, cd, cdMax, color, unlocked, readyPulse) {
+function drawButton(c, b, label, cd, cdMax, color, unlocked, readyPulse, icon) {
   c.fillStyle = 'rgba(20,26,36,0.5)';
   c.beginPath(); c.arc(b.x, b.y + 4, b.r, 0, Math.PI * 2); c.fill();
   c.fillStyle = INK;
@@ -1206,10 +1382,21 @@ function drawButton(c, b, label, cd, cdMax, color, unlocked, readyPulse) {
     c.globalAlpha = 1;
   }
 
-  c.font = `900 ${Math.round(b.r * 0.62)}px ${FONT}`;
-  c.textAlign = 'center';
-  c.fillStyle = unlocked ? '#ffffff' : 'rgba(170,176,198,0.75)';
-  c.fillText(label, b.x, b.y + b.r * 0.22);
+  if (icon && icon.ready) {
+    // ícone pintado, recortado no círculo do botão
+    c.save();
+    c.beginPath(); c.arc(b.x, b.y, b.r - 2.5, 0, Math.PI * 2); c.clip();
+    c.globalAlpha = unlocked ? 1 : 0.38;
+    const di = (b.r - 2.5) * 2;
+    c.drawImage(icon.img, b.x - di / 2, b.y - di / 2, di, di);
+    c.restore();
+    c.globalAlpha = 1;
+  } else {
+    c.font = `900 ${Math.round(b.r * 0.62)}px ${FONT}`;
+    c.textAlign = 'center';
+    c.fillStyle = unlocked ? '#ffffff' : 'rgba(170,176,198,0.75)';
+    c.fillText(label, b.x, b.y + b.r * 0.22);
+  }
 
   if (!unlocked) {
     c.font = `800 ${Math.round(b.r * 0.3)}px ${FONT}`;

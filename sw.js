@@ -5,7 +5,7 @@
  * (não mudam a toda hora e carregam instantâneo).
  * Ao publicar uma versão nova, suba o número do CACHE.
  */
-const CACHE = 'arena-frenetica-v3';
+const CACHE = 'arena-frenetica-v4';
 
 const CORE = [
   './', './index.html', './manifest.json',
@@ -18,6 +18,14 @@ const CORE = [
   './src/main.js',
   './assets/heroes/brutus.png', './assets/heroes/lyra.png',
   './assets/heroes/nix.png', './assets/heroes/sol.png',
+  './assets/structures/tower_blue.png', './assets/structures/tower_red.png',
+  './assets/structures/base_blue.png', './assets/structures/base_red.png',
+  './assets/dragon/dragon.png', './assets/dragon/pit.png',
+  './assets/decor/tree.png', './assets/decor/bush.png', './assets/decor/flowers.png',
+  './assets/textures/grass.png', './assets/textures/dirt.png', './assets/textures/stone.png',
+  './assets/skills/aa.png', './assets/skills/investida.png', './assets/skills/terremoto.png',
+  './assets/skills/flecha.png', './assets/skills/chuva.png', './assets/skills/passo.png',
+  './assets/skills/orbe.png', './assets/skills/zona.png',
   './assets/icons/icon-192.png', './assets/icons/icon-512.png',
 ];
 

@@ -19,6 +19,17 @@ M.MAPS.C = {
   desc: 'Vertical: rio, travessias e o dragão na ilha.',
   size: { w: 900, h: 1600 },
   axis: 'y',                       // time 0 avança diminuindo o y (de baixo p/ cima)
+  artTheme: true,                  // usa as artes pintadas (assets/) neste mapa
+
+  // enfeites pintados (visual, sem colisão): árvores nas bordas + flores
+  decor: [
+    { kind: 'tree', x: 60,  y: 245,  h: 120 }, { kind: 'tree', x: 840, y: 245,  h: 120 },
+    { kind: 'tree', x: 60,  y: 1360, h: 120 }, { kind: 'tree', x: 840, y: 1360, h: 120 },
+    { kind: 'tree', x: 450, y: 292,  h: 110 }, { kind: 'tree', x: 450, y: 1308, h: 110 },
+    { kind: 'tree', x: 845, y: 545,  h: 105 }, { kind: 'tree', x: 55,  y: 1055, h: 105 },
+    { kind: 'flowers', x: 305, y: 178,  h: 40 }, { kind: 'flowers', x: 595, y: 1422, h: 40 },
+    { kind: 'flowers', x: 760, y: 655,  h: 40 }, { kind: 'flowers', x: 140, y: 945,  h: 40 },
+  ],
 
   // time 0 = azul (BAIXO), time 1 = vermelho (CIMA)
   bases: [ { x: 450, y: 1520 }, { x: 450, y: 80 } ],
