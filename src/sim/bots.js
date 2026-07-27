@@ -28,14 +28,22 @@ function nearest(pos, list) {
   return best;
 }
 
+// lane de uma posição: a de waypoint mais próximo (funciona em qualquer orientação)
 function laneOfPos(st, pos) {
   let best = 0, bd = Infinity;
   for (const lane of st.map.lanes) {
-    const mid = lane.waypoints[Math.floor(lane.waypoints.length / 2)];
-    const d = Math.abs(pos.y - mid.y);
-    if (d < bd) { bd = d; best = lane.id; }
+    for (const wp of lane.waypoints) {
+      const d = V.dist2(pos, wp);
+      if (d < bd) { bd = d; best = lane.id; }
+    }
   }
   return best;
+}
+
+// progresso de avanço conforme o eixo do mapa (x: time 0 → direita; y: time 0 → cima)
+function progOf(st, team, pos) {
+  if (st.map.axis === 'y') return team === 0 ? -pos.y : pos.y;
+  return team === 0 ? pos.x : -pos.x;
 }
 
 // posição do minion aliado mais avançado na lane (frontline do farm)
@@ -43,7 +51,7 @@ function frontWavePos(st, team, laneId) {
   let best = null, bestProg = -Infinity;
   for (const m of st.minions) {
     if (m.team !== team || !m.alive || m.lane !== laneId) continue;
-    const prog = team === 0 ? m.pos.x : -m.pos.x;
+    const prog = progOf(st, team, m.pos);
     if (prog > bestProg) { bestProg = prog; best = m; }
   }
   return best ? { x: best.pos.x, y: best.pos.y } : null;

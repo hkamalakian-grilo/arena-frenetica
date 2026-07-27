@@ -39,6 +39,7 @@ function startMatch() {
     difficulty: APP.menu.difficulty,
   });
   M.fx.reset(0);
+  M.renderer.setArena(APP.st.map.size.w, APP.st.map.size.h);   // retrato ou paisagem, por mapa
   M.controls.enabled = false;              // libera quando a contagem acabar
   APP.acc = 0; APP.freeze = 0; APP.endAt = 0;
   APP.introT = 3.6; APP.lastCount = 4;     // apresentação + 3-2-1-LUTE!
@@ -72,8 +73,13 @@ function loop(now) {
   const view = M.renderer.view;
 
   if (APP.screen === 'game' && APP.st) {
-    // mobile em pé → pede paisagem (§2) e pausa
-    if (view.h > view.w) { M.renderer.renderRotateHint(); APP.acc = 0; return; }
+    // em tela pequena (celular), a orientação precisa combinar com o MAPA:
+    // A/B são deitados, C é em pé; desktop grande só faz letterbox
+    const mapPortrait = APP.st.map.size.h > APP.st.map.size.w;
+    const winPortrait = view.h > view.w;
+    if (Math.min(view.w, view.h) < 700 && mapPortrait !== winPortrait) {
+      M.renderer.renderRotateHint(mapPortrait); APP.acc = 0; return;
+    }
 
     // cerimônia de abertura: duplas + 3-2-1-LUTE! (sim parada)
     if (APP.introT > 0) {

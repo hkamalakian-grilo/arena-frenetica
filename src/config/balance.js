@@ -30,7 +30,7 @@ M.BAL = {
     thresholds: [0, 105, 250, 440, 680], // XP acumulado p/ nível 1..5
     // Multiplicador por mapa (§6): Mapa B tem farm solo por lane,
     // então rende mais XP por herói — calibrado p/ nível 4 em ~1:20–1:40 nos dois
-    mapMult: { A: 1.0, B: 0.65 },
+    mapMult: { A: 1.0, B: 0.65, C: 0.65 },
   },
 
   levelBonus: { hp: 0.08, dmg: 0.06 },   // por nível (§8), sem cura no level up
@@ -40,8 +40,8 @@ M.BAL = {
   waves: {
     firstAt: 5, interval: 13,            // §6
     sdInterval: 10, sdExtraMelee: 1,     // reforço no sudden death (§6)
-    // Composição por lane (§6): A = lane única; B = por lane, reduzida
-    comp: { A: { melee: 3, ranged: 1 }, B: { melee: 2, ranged: 1 } },
+    // Composição por lane (§6): A = lane única; B/C = por lane, reduzida
+    comp: { A: { melee: 3, ranged: 1 }, B: { melee: 2, ranged: 1 }, C: { melee: 2, ranged: 1 } },
   },
 
   minion: {
@@ -61,6 +61,7 @@ M.BAL = {
     // mesma medida p/ o cerco COM minions continuar fechando partidas
     A: { t1: { hp: 1050, dmg: 125 }, t2: { hp: 1150, dmg: 150 } },
     B: { lane: { hp: 1150, dmg: 135 } },
+    C: { lane: { hp: 1150, dmg: 135 } },
   },
 
   base: { hp: 2000, radius: 44 },

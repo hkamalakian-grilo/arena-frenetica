@@ -56,7 +56,7 @@ function makeTower(st, def) {
   const T = M.BAL.tower;
   const stats = st.map.id === 'A'
     ? (def.tier === 1 ? T.A.t1 : T.A.t2)
-    : T.B.lane;
+    : ((T[st.map.id] && T[st.map.id].lane) || T.B.lane);
   return {
     id: st.nextId++, kind: 'tower', team: def.team, tier: def.tier, lane: def.lane,
     pos: { x: def.x, y: def.y }, prevPos: { x: def.x, y: def.y },

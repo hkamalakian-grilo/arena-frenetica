@@ -11,7 +11,9 @@ moderno (Chrome, Edge, Firefox), inclusive no celular (paisagem/horizontal).
 
 1. Escolha o seu herói, o **parceiro** (bot), o mapa e a **dificuldade** (Fácil/Normal/Difícil,
    vale só para os inimigos) e toque **JOGAR** — as duplas se apresentam e a contagem 3-2-1-LUTE!
-   solta a partida (toque na tela para pular).
+   solta a partida (toque na tela para pular). São **3 mapas**: A e B deitados (paisagem) e o
+   **C "Travessia" em pé** (vertical, estilo Clash Royale: rio, pontes e o dragão na ilha) —
+   no celular, segure o aparelho conforme o mapa.
 2. Você + seu parceiro contra 2 bots. Destrua a **base** inimiga (ou tenha mais torres aos 3:00).
    No fim, a tabela mostra K/D/A, dano, cura e farm de cada um — com coroa de **MVP**.
 3. O **Dragão** nasce aos 2:00 no centro: o time que o matar ganha +30% de dano por 45s e

@@ -65,6 +65,21 @@ Cada linha: a decisão e a justificativa em uma linha.
   Nix capuz + adagas que cruzam no ataque; Sol auréola flutuante + raios que flaram ao castar.
   Mesmos desenhos no jogo, no menu e na apresentação.
 
+## Mapa C "Travessia" e orientação POR MAPA (pedido do usuário)
+
+- **Acréscimo, não mudança**: os mapas A/B seguem deitados e intocados; o C é RETRATO
+  (900×1600, você embaixo de azul), inspirado na referência de arte do usuário (rio, pontes,
+  ilha do dragão). O motor passou a suportar **orientação por mapa**: o encaixe de tela usa o
+  tamanho do mapa ativo (`renderer.setArena`), e o aviso de "girar o celular" pede a orientação
+  DO MAPA (só em telas pequenas; desktop faz letterbox).
+- **Rio como parede de água**: paredes com `type:'water'` bloqueiam movimento/navegação como
+  qualquer parede, mas são desenhadas chatas (rio) na camada estática; `map.bridges` são
+  decoração de tábuas sobre as travessias (a passagem em si é o vão entre as águas).
+- **IA independente de orientação**: lane de uma posição agora é a de waypoint mais próximo, e
+  o progresso de avanço usa o eixo do mapa (`map.axis: 'x'|'y'`). Validado: 8 partidas headless
+  no C (2:51 de média, 13% de morte súbita, dragão 100% contestado, zero travadas) e Mapa B
+  re-verificado sem regressão.
+
 ## Apresentação / controles
 
 - **Direção de arte "toy/cartoon"** (pedido do usuário, referência Clash Royale): arena clara de

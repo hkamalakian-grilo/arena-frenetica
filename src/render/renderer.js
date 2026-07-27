@@ -37,6 +37,7 @@ const R = {
   view: { scale: 1, offX: 0, offY: 0, w: 0, h: 0, dpr: 1, tilt: TILT },
   staticCv: null, staticMapId: null,
   sprites: {},   // hero id -> { img, ready, ar (w/h) }
+  arenaW: 0, arenaH: 0,   // dimensões da arena ATUAL (por mapa; retrato ou paisagem)
 };
 
 // carrega as artes dos heróis (assets/heroes/<id>.png); se faltar, o render cai
@@ -104,12 +105,19 @@ function resize() {
   R.canvas.height = Math.round(h * dpr);
   R.canvas.style.width = w + 'px';
   R.canvas.style.height = h + 'px';
-  const A = M.BAL.arena;
-  const ah = A.h * TILT + WALL_H;             // altura visual da arena inclinada
-  const scale = Math.min(w / A.w, h / ah);
-  R.view = { scale, offX: (w - A.w * scale) / 2, offY: (h - ah * scale) / 2 + WALL_H * scale,
+  const aw = R.arenaW || M.BAL.arena.w;       // arena do mapa atual (retrato ou paisagem)
+  const ah0 = R.arenaH || M.BAL.arena.h;
+  const ah = ah0 * TILT + WALL_H;             // altura visual da arena inclinada
+  const scale = Math.min(w / aw, h / ah);
+  R.view = { scale, offX: (w - aw * scale) / 2, offY: (h - ah * scale) / 2 + WALL_H * scale,
              w, h, dpr, tilt: TILT };
   if (M.controls) M.controls.view = R.view;
+}
+
+/** Define a arena do mapa ativo (chamado ao iniciar partida) e reencaixa a tela. */
+function setArena(w, h) {
+  R.arenaW = w; R.arenaH = h;
+  resize();
 }
 
 // ---- utilitários ----
@@ -204,6 +212,40 @@ function buildStatic(map) {
   drawGrass(c, map.size.w, map.size.h);
   for (const b of map.laneBands || []) drawPath(c, b, 26);
   if (map.plaza) drawPath(c, map.plaza, 34);
+
+  // rio (paredes type:'water'): faixas contínuas de água, chatas no chão,
+  // intransponíveis na simulação; margens escuras em cima/embaixo
+  for (const w of map.walls) {
+    if (w.type !== 'water') continue;
+    c.fillStyle = '#2f6f9e';
+    c.fillRect(w.x - 4, w.y - 6, w.w + 8, w.h + 12);                    // margem
+    c.fillStyle = '#3f8ec4';
+    c.fillRect(w.x - 4, w.y, w.w + 8, w.h);                             // água
+    c.fillStyle = '#5cb0dd';                                            // brilho raso
+    c.fillRect(w.x - 4, w.y + 5, w.w + 8, Math.max(8, w.h * 0.28));
+    c.strokeStyle = 'rgba(255,255,255,0.5)'; c.lineWidth = 2;           // onditas
+    const n = Math.max(2, Math.round(w.w / 46));
+    for (let i = 0; i < n; i++) {
+      const wx = w.x + 10 + (i + hash01(w.x, i) * 0.5) * (w.w - 20) / n;
+      const wy = w.y + w.h * (0.35 + 0.4 * hash01(i, w.y));
+      c.beginPath(); c.arc(wx, wy, 5, Math.PI * 0.15, Math.PI * 0.85); c.stroke();
+    }
+  }
+
+  // pontes de madeira sobre as travessias (decoração; a passagem já é livre)
+  for (const b of map.bridges || []) {
+    c.fillStyle = '#6e4620';
+    roundRect(c, b.x - 5, b.y - 5, b.w + 10, b.h + 10, 10); c.fill();
+    c.fillStyle = '#a8763d';
+    roundRect(c, b.x, b.y, b.w, b.h, 7); c.fill();
+    c.strokeStyle = 'rgba(96,58,22,0.6)'; c.lineWidth = 2;              // tábuas
+    for (let py = b.y + 10; py < b.y + b.h - 4; py += 13) {
+      c.beginPath(); c.moveTo(b.x + 4, py); c.lineTo(b.x + b.w - 4, py); c.stroke();
+    }
+    c.lineWidth = 4; c.strokeStyle = '#5b3a16';                         // guarda-corpo
+    c.beginPath(); c.moveTo(b.x + 3, b.y + 2); c.lineTo(b.x + 3, b.y + b.h - 2); c.stroke();
+    c.beginPath(); c.moveTo(b.x + b.w - 3, b.y + 2); c.lineTo(b.x + b.w - 3, b.y + b.h - 2); c.stroke();
+  }
 
   c.lineWidth = 12; c.strokeStyle = GRASS_EDGE;
   c.strokeRect(6, 6, map.size.w - 12, map.size.h - 12);
@@ -717,6 +759,7 @@ function render(st, alpha, opts) {
   const list = [];
 
   for (const w of st.map.walls) {
+    if (w.type === 'water') continue;   // rio é chão (desenhado na camada estática)
     list.push({ sy: w.y + w.h, fn: () => drawWallStanding(c, w) });
   }
   for (const b of st.bases) {
@@ -1188,8 +1231,12 @@ function drawButton(c, b, label, cd, cdMax, color, unlocked, readyPulse) {
 
 // ---- menu (seleção herói + parceiro + mapa + dificuldade) ----
 
-function drawMiniMap(c, map, x, y, w, h) {
-  const kx = w / map.size.w, ky = h / map.size.h;
+function drawMiniMap(c, map, bx, by, bw, bh) {
+  // encaixa o mapa (retrato OU paisagem) dentro da caixa, centralizado
+  const k = Math.min(bw / map.size.w, bh / map.size.h);
+  const w = map.size.w * k, h = map.size.h * k;
+  const x = bx + (bw - w) / 2, y = by + (bh - h) / 2;
+  const kx = k, ky = k;
   c.fillStyle = GRASS_B; roundRect(c, x, y, w, h, 8); c.fill();
   for (const b of map.laneBands || []) {
     c.fillStyle = PATH;
@@ -1200,7 +1247,7 @@ function drawMiniMap(c, map, x, y, w, h) {
     c.fillRect(x + map.plaza.x * kx, y + map.plaza.y * ky, map.plaza.w * kx, map.plaza.h * ky);
   }
   for (const wl of map.walls) {
-    c.fillStyle = STONE_DARK;
+    c.fillStyle = wl.type === 'water' ? '#4fa3d8' : STONE_DARK;
     c.fillRect(x + wl.x * kx, y + wl.y * ky, wl.w * kx, wl.h * ky);
   }
   for (const bs of map.bushes) {
@@ -1301,29 +1348,30 @@ function renderMenu(menu) {
     rects.allies.push({ id, x, y: y1, w: aw, h: ah });
   }
 
-  const mw = Math.min(196, W * 0.2), mh = Math.min(112, H * 0.2);
+  const mapIds = ['A', 'B', 'C'];
+  const mw = Math.min(150, W * 0.155), mh = Math.min(112, H * 0.2);
   const dw = Math.min(126, W * 0.135), dh = Math.min(30, H * 0.058), dgap = 8;
-  const groupW = mw * 2 + 14 + 26 + dw;
+  const groupW = mw * mapIds.length + 14 * (mapIds.length - 1) + 26 + dw;
   const y2 = y1 + ah + H * 0.052;
   const gx = cx - groupW / 2;
   c.font = `800 ${Math.min(12, H * 0.023)}px ${FONT}`;
   c.fillStyle = 'rgba(190,215,180,0.75)';
-  c.fillText('MAPA', gx + mw + 7, y2 - 7);
-  c.fillText('DIFICULDADE', gx + mw * 2 + 40 + dw / 2 - 14, y2 - 7);
-  for (let i = 0; i < 2; i++) {
-    const id = i === 0 ? 'A' : 'B';
+  c.fillText('MAPA', gx + (mw * mapIds.length + 14 * (mapIds.length - 1)) / 2, y2 - 7);
+  c.fillText('DIFICULDADE', gx + mw * mapIds.length + 14 * (mapIds.length - 1) + 26 + dw / 2, y2 - 7);
+  for (let i = 0; i < mapIds.length; i++) {
+    const id = mapIds[i];
     const map = M.MAPS[id];
     const x = gx + i * (mw + 14);
     const sel = menu.map === id;
     card(x, y2, mw, mh, sel);
-    drawMiniMap(c, map, x + 8, y2 + 7, mw - 16, (mw - 16) * 9 / 16 * 0.78);
+    drawMiniMap(c, map, x + 8, y2 + 6, mw - 16, mh - 34);
     c.fillStyle = '#ffffff';
-    c.font = `900 ${Math.min(12, mh * 0.12)}px ${FONT}`;
+    c.font = `900 ${Math.min(11.5, mh * 0.115)}px ${FONT}`;
     c.fillText(`${id} — ${map.name}`, x + mw / 2, y2 + mh - 9);
     rects.maps.push({ id, x, y: y2, w: mw, h: mh });
   }
   const diffs = [['facil', 'Fácil'], ['normal', 'Normal'], ['dificil', 'Difícil']];
-  const dx = gx + mw * 2 + 40;
+  const dx = gx + mw * mapIds.length + 14 * (mapIds.length - 1) + 26;
   for (let i = 0; i < 3; i++) {
     const [id, nome] = diffs[i];
     const y = y2 + i * (dh + dgap);
@@ -1548,7 +1596,7 @@ function renderResult(st, opts) {
   return rects;
 }
 
-function renderRotateHint() {
+function renderRotateHint(wantPortrait) {
   const c = R.ctx, view = R.view;
   c.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
   c.fillStyle = '#0d1811'; c.fillRect(0, 0, view.w, view.h);
@@ -1556,9 +1604,10 @@ function renderRotateHint() {
   c.font = `900 26px ${FONT}`; c.fillStyle = '#ffffff';
   c.fillText('Gire o celular 🔄', view.w / 2, view.h / 2 - 10);
   c.font = `700 15px ${FONT}`; c.fillStyle = 'rgba(190,215,180,0.9)';
-  c.fillText('O jogo é em paisagem (horizontal)', view.w / 2, view.h / 2 + 22);
+  c.fillText(wantPortrait ? 'Este mapa é em pé (vertical)' : 'Este mapa é deitado (horizontal)',
+             view.w / 2, view.h / 2 + 22);
 }
 
-M.renderer = { init, resize, render, renderMenu, renderIntro, renderResult, renderRotateHint,
-               get view() { return R.view; } };
+M.renderer = { init, resize, setArena, render, renderMenu, renderIntro, renderResult,
+               renderRotateHint, get view() { return R.view; } };
 })();
