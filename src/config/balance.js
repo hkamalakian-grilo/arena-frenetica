@@ -11,7 +11,7 @@ M.BAL = {
   arena: { w: 1600, h: 900 },
 
   // Mapa default quando não escolhido na tela inicial (§4)
-  defaultMap: 'A',
+  defaultMap: 'C',
 
   match: {
     duration: 180,        // 3:00 de partida padrão (§10)
@@ -45,8 +45,8 @@ M.BAL = {
   },
 
   minion: {
-    melee:  { hp: 300, dmg: 25, range: 50,  period: 1.0, speed: 195, radius: 13 },
-    ranged: { hp: 180, dmg: 35, range: 150, period: 1.0, speed: 195, radius: 12, projSpeed: 520 },
+    melee:  { hp: 300, dmg: 25, range: 50,  period: 1.0, speed: 85, radius: 13 },
+    ranged: { hp: 180, dmg: 35, range: 150, period: 1.0, speed: 85, radius: 12, projSpeed: 520 },
     aggroRadius: 300,      // percepção (§6)
     leash: 480,            // solta o alvo se afastar demais
     reinforcedMult: 1.5,   // waves reforçadas: +50% HP e dano (§9)
@@ -83,18 +83,30 @@ M.BAL = {
 
   bush: { revealOnAction: 1.5 },         // atacar/castar revela por 1,5s (§4)
 
+  // Movimento com inércia leve: tempos em segundos para atingir velocidade
+  // máxima, parar e inverter a direção. Mantém resposta mobile sem deslizar.
+  movement: {
+    accelTime: 0.32,
+    brakeTime: 0.22,
+    reverseTime: 0.18,
+    wallSlide: 0.72,
+  },
+
   // ---- Heróis (§7). TTK alvo em trade justo 1v1: 4–6s. ----
   heroes: {
     brutus: {
       name: 'Brutus', role: 'Tanque', shape: 'hex', color: '#e8a33d',
-      hp: 1150, speed: 260, radius: 21,
-      aa: { dmg: 60, range: 90, period: 0.78 },
-      q: { name: 'Investida', cd: 7, dmg: 80, dashLen: 350, dashSpeed: 1150, stun: 0.8 },
-      r: { name: 'Terremoto', cd: 45, dmg: 200, radius: 250, slowPct: 0.4, slowDur: 2, tele: 0.4 },
+      hp: 1150, speed: 107.5, radius: 21,
+      aa: { dmg: 60, range: 90, period: 0.78, windup: 0.27, rangeGrace: 18 },
+      q: { name: 'Investida', cd: 7, dmg: 80, dashLen: 350, dashSpeed: 450,
+           windup: 0.18, stun: 0.8 },
+      r: { name: 'Escudo Bumerangue', cd: 35, dmg: 160, range: 520, width: 64,
+           projSpeed: 760, slowPct: 0.3, slowDur: 1.5, releaseDelay: 0.52,
+           recoveryLock: 0.64 },
     },
     lyra: {
       name: 'Lyra', role: 'Atiradora', shape: 'diamond', color: '#7ee08a',
-      hp: 750, speed: 270, radius: 18,
+      hp: 750, speed: 112.5, radius: 18,
       aa: { dmg: 72, range: 305, period: 0.75, projSpeed: 950 },
       q: { name: 'Flecha Perfurante', cd: 6, dmg: 120, range: 600, width: 22, projSpeed: 980 },
       r: { name: 'Chuva de Flechas', cd: 40, dps: 60, dur: 3, radius: 200, castRange: 500,
@@ -102,14 +114,14 @@ M.BAL = {
     },
     nix: {
       name: 'Nix', role: 'Assassino', shape: 'tri', color: '#b07ce8',
-      hp: 800, speed: 300, radius: 18,
+      hp: 800, speed: 122.5, radius: 18,
       aa: { dmg: 90, range: 100, period: 0.62 },
       q: { name: 'Passo Sombrio', cd: 8, blinkLen: 300, bonusDmg: 100, bonusWindow: 3 },
-      r: { name: 'Execução', cd: 50, dmg: 280, execHpPct: 0.35, range: 450, dashSpeed: 1400 },
+      r: { name: 'Execução', cd: 50, dmg: 280, execHpPct: 0.35, range: 450, dashSpeed: 550 },
     },
     sol: {
       name: 'Sol', role: 'Suporte', shape: 'circle', color: '#ffd166',
-      hp: 700, speed: 265, radius: 18,
+      hp: 700, speed: 110, radius: 18,
       aa: { dmg: 62, range: 300, period: 0.8, projSpeed: 880 },
       q: { name: 'Orbe Solar', cd: 7, dmg: 100, heal: 140, range: 560, width: 22, projSpeed: 840 },
       r: { name: 'Zona Radiante', cd: 45, radius: 220, dur: 4, castRange: 450,
@@ -151,7 +163,9 @@ M.BAL = {
   },
 
   fx: {
-    hitstopMs: 40,           // §13
+    hitstopMs: 40,           // habilidades pesadas (§13)
+    meleeHitstopMs: 30,      // contato corpo a corpo comum
+    brutusMeleeHitstopMs: 52,// pancada de escudo: mais peso sem atrasar a sim
     bannerT: 1.5,            // banner central (§12)
     dmgFloatT: 0.9,
   },

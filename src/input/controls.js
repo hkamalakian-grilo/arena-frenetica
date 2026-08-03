@@ -58,6 +58,7 @@ function onDown(ev) {
     M.audio.toggleMute();
     return;
   }
+  try { if (C.canvas.setPointerCapture) C.canvas.setPointerCapture(ev.pointerId); } catch (_) {}
   const L = layout();
   for (const slot of ['aa', 'q', 'r']) {
     const b = L[slot];
@@ -86,6 +87,7 @@ function onMove(ev) {
 
 function onUp(ev) {
   const p = pos(ev);
+  try { if (C.canvas.releasePointerCapture) C.canvas.releasePointerCapture(ev.pointerId); } catch (_) {}
   if (C.joy && C.joy.id === ev.pointerId) { C.joy = null; }
   for (let i = C.holds.length - 1; i >= 0; i--) {
     const hd = C.holds[i];
@@ -108,6 +110,31 @@ function onUp(ev) {
   }
 }
 
+function onCancel(ev) {
+  // OS/browser interruptions are not intentional releases. Clear every piece
+  // of state owned by this pointer without queuing the aimed ability.
+  try { if (C.canvas.releasePointerCapture) C.canvas.releasePointerCapture(ev.pointerId); } catch (_) {}
+  if (C.joy && C.joy.id === ev.pointerId) C.joy = null;
+  for (let index = C.holds.length - 1; index >= 0; index--) {
+    if (C.holds[index].id === ev.pointerId) C.holds.splice(index, 1);
+  }
+  C.aimPreview = null;
+}
+
+function resetInput() {
+  const pointerIds = new Set(C.holds.map(hold => hold.id));
+  if (C.joy) pointerIds.add(C.joy.id);
+  for (const pointerId of pointerIds) {
+    try { if (C.canvas && C.canvas.releasePointerCapture) C.canvas.releasePointerCapture(pointerId); } catch (_) {}
+  }
+  C.joy = null;
+  C.holds.length = 0;
+  C.queued.length = 0;
+  C.mouse.down = false;
+  C.aimPreview = null;
+  for (const key of Object.keys(C.keys)) delete C.keys[key];
+}
+
 function onKey(ev, down) {
   const k = ev.key.toLowerCase();
   if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'q', 'r'].includes(k)) {
@@ -124,7 +151,7 @@ function init(canvas) {
   canvas.addEventListener('pointerdown', onDown, { passive: false });
   canvas.addEventListener('pointermove', onMove, { passive: false });
   canvas.addEventListener('pointerup', onUp, { passive: false });
-  canvas.addEventListener('pointercancel', onUp, { passive: false });
+  canvas.addEventListener('pointercancel', onCancel, { passive: false });
   window.addEventListener('keydown', (e) => onKey(e, true));
   window.addEventListener('keyup', (e) => onKey(e, false));
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -190,5 +217,6 @@ C.layout = layout;
 C.init = init;
 C.getCommand = getCommand;
 C.toWorld = toWorld;
+C.resetInput = resetInput;
 M.controls = C;
 })();

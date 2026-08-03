@@ -12,7 +12,7 @@ const ROSTER = ['brutus', 'lyra', 'nix', 'sol'];
 
 const APP = {
   screen: 'menu',              // 'menu' | 'game' | 'result'
-  menu: { hero: 'lyra', ally: 'sol', map: M.BAL.defaultMap, difficulty: 'normal' },
+  menu: { hero: 'brutus', ally: 'sol', map: M.BAL.defaultMap, difficulty: 'normal' },
   st: null,
   acc: 0, last: 0, freeze: 0,
   endAt: 0,
@@ -30,6 +30,7 @@ function pickEnemies() {
 }
 
 function startMatch() {
+  M.controls.resetInput();
   const [e1, e2] = pickEnemies();
   APP.st = M.createMatch({
     mapId: APP.menu.map,
@@ -39,6 +40,7 @@ function startMatch() {
     difficulty: APP.menu.difficulty,
   });
   M.fx.reset(0);
+  M.animations.reset(APP.st);
   M.renderer.setArena(APP.st.map.size.w, APP.st.map.size.h);   // retrato ou paisagem, por mapa
   M.controls.enabled = false;              // libera quando a contagem acabar
   APP.acc = 0; APP.freeze = 0; APP.endAt = 0;
@@ -90,6 +92,7 @@ function loop(now) {
     const mapPortrait = APP.st.map.size.h > APP.st.map.size.w;
     const winPortrait = view.h > view.w;
     if (Math.min(view.w, view.h) < 700 && mapPortrait !== winPortrait) {
+      M.controls.resetInput();
       M.renderer.renderRotateHint(mapPortrait); APP.acc = 0; return;
     }
 
@@ -97,6 +100,7 @@ function loop(now) {
     if (APP.introT > 0) {
       APP.introT -= dtms / 1000;
       M.fx.update(dtms / 1000, APP.st);
+      M.animations.update(dtms / 1000, APP.st);
       M.renderer.render(APP.st, 1, { playerTeam: 0, aimPreview: null, fps: 0 });
       if (APP.introT > 0) {
         M.renderer.renderIntro(APP.st, APP.introT);
@@ -112,8 +116,11 @@ function loop(now) {
       return;
     }
 
-    // hitstop (§13): congela a simulação, não o render
-    if (APP.freeze > 0) APP.freeze -= dtms;
+    // Hitstop segura também a pose animada de contato. O canvas continua
+    // redesenhando (partículas e câmera permanecem vivas), mas o corpo não
+    // escapa para o backswing enquanto o mundo está congelado.
+    let animationFrozen = APP.freeze > 0;
+    if (animationFrozen) APP.freeze = Math.max(0, APP.freeze - dtms);
     else APP.acc += dtms;
 
     let steps = 0;
@@ -122,14 +129,24 @@ function loop(now) {
       const cmd = M.controls.getCommand(APP.st, player);
       M.step(APP.st, cmd);
       M.fx.ingest(APP.st, APP.st.events);
+      M.animations.ingest(APP.st, APP.st.events);
       M.audio.ingest(APP.st, APP.st.events);
       APP.st.events.length = 0;
       APP.acc -= STEP; steps++;
       const hs = M.fx.consumeHitstop();
-      if (hs > 0) { APP.freeze = hs; break; }
+      if (hs > 0) {
+        APP.freeze = Math.max(APP.freeze, hs);
+        animationFrozen = true;
+        break;
+      }
     }
 
     M.fx.update(dtms / 1000, APP.st);
+    // Actions must advance by authoritative simulated time. On a slow frame we
+    // cap catch-up at six 60 Hz ticks; advancing animation by the full wall
+    // time would show impact/release before damage or projectile creation.
+    const simulatedDt = steps * STEP / 1000;
+    M.animations.update(animationFrozen ? 0 : simulatedDt, APP.st, animationFrozen);
     M.audio.update(APP.st);
     M.renderer.render(APP.st, Math.min(1, APP.acc / STEP), {
       playerTeam: 0,
@@ -139,7 +156,9 @@ function loop(now) {
 
     if (APP.st.phase === 'ended') {
       if (!APP.endAt) APP.endAt = now + 1500;
-      else if (now >= APP.endAt) { APP.screen = 'result'; M.controls.enabled = false; }
+      else if (now >= APP.endAt) {
+        APP.screen = 'result'; M.controls.enabled = false; M.controls.resetInput();
+      }
     }
   } else if (APP.screen === 'menu') {
     APP.menuRects = M.renderer.renderMenu(APP.menu);
@@ -152,6 +171,7 @@ function loop(now) {
 function boot() {
   const canvas = document.getElementById('game');
   M.renderer.init(canvas);
+  M.animations.loadSheets();
   M.controls.init(canvas);
   M.audio.init(canvas);
   M.controls.tapCb = (x, y) => {
@@ -177,8 +197,10 @@ globalThis.__moba = {
       const player = APP.st.playerIndex >= 0 ? APP.st.heroes[APP.st.playerIndex] : null;
       M.step(APP.st, cmd || M.controls.getCommand(APP.st, player));
       M.fx.ingest(APP.st, APP.st.events);
+      M.animations.ingest(APP.st, APP.st.events);
       APP.st.events.length = 0;
-      M.fx.update(1 / 60, APP.st);   // envelhece efeitos tick a tick, como no loop real
+      M.fx.update(1 / 60, APP.st);
+      M.animations.update(1 / 60, APP.st);   // envelhece efeitos tick a tick, como no loop real
     }
     M.renderer.render(APP.st, 1, { playerTeam: 0, aimPreview: M.controls.aimPreview, fps: 0 });
     return { time: +APP.st.time.toFixed(2), phase: APP.st.phase };

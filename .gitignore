@@ -3,3 +3,9 @@
 Thumbs.db
 Desktop.ini
 *.zip
+
+# Generated editor/import caches and local QA artifacts
+**/.godot/
+*.blend1
+outputs/
+godot/brutus_3d/tools/travessia_capture.png*

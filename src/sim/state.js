@@ -15,9 +15,13 @@ function makeHero(st, heroId, team, slot, isBot) {
     pos: { x: spawn.x, y: spawn.y }, prevPos: { x: spawn.x, y: spawn.y },
     spawn: { x: spawn.x, y: spawn.y },
     radius: B.radius, facing: { x: team === 0 ? 1 : -1, y: 0 },
+    moveVel: { x: 0, y: 0 },
     baseHp: B.hp, maxHp: B.hp, hp: B.hp, alive: true,
     level: 1, xp: 0, ultUnlocked: false,
     aaCd: 0, qCd: 0, rCd: 0,
+    aaVariant: 0,                    // alterna os dois golpes autorais do Brutus
+    aaWindup: null,                // { t, targetId } — impacto corpo a corpo atrasado
+    actionLockT: 0,                // trava curta para ações com preparação visível
     // buffs/debuffs (§3 de M3): timers em s
     stunT: 0, slowT: 0, slowPct: 0, revealT: 0, invulnT: 0,
     empowerT: 0,                  // Nix Q: próximo AA reforçado

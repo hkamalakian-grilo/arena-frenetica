@@ -84,12 +84,47 @@ function ingest(st, events) {
         break;
       }
       case 'aaHit':
-        burst(ev.pos.x, ev.pos.y, ev.tower ? 8 : 4, '#ffe9b0', ev.tower ? 160 : 110, 3, 0.3);
+        {
+          const source = st.heroes.find(hero => hero.id === ev.heroId);
+          const heavyBrutusHit = ev.melee && source && source.hero === 'brutus';
+          burst(ev.pos.x, ev.pos.y, ev.tower ? 8 : (heavyBrutusHit ? 9 : 4),
+                '#ffe9b0', ev.tower ? 160 : (heavyBrutusHit ? 155 : 110),
+                heavyBrutusHit ? 3.8 : 3, heavyBrutusHit ? 0.38 : 0.3);
+          if (ev.melee) {
+            const pause = heavyBrutusHit
+              ? M.BAL.fx.brutusMeleeHitstopMs
+              : M.BAL.fx.meleeHitstopMs;
+            FX.hitstop = Math.max(FX.hitstop, pause || 0);
+          }
+          if (heavyBrutusHit) { shake(2.8); vibrate(14); }
+        }
         break;
       case 'aoeHit':
         ring(ev.pos.x, ev.pos.y, ev.radius || 40, '#ffffff', 0.35);
         burst(ev.pos.x, ev.pos.y, 12, ev.kind === 'nixExec' ? '#ff3d6e' : '#ffd23f', 180, 3.5, 0.45);
+        if (ev.kind === 'brutusQhit') { shake(6); vibrate(28); }
+        else if (ev.kind === 'brutusRhit') shake(3.5);
         if (ev.kind === 'nixExec') { shake(7); banner('EXECUTADO!', '#ff3d6e'); }
+        break;
+      case 'brutusQEnd':
+        if (ev.reason === 'wall') {
+          ring(ev.pos.x, ev.pos.y, 34, '#cbd3dc', 0.22);
+          burst(ev.pos.x, ev.pos.y, 10, '#ffad28', 135, 3.5, 0.30);
+          shake(4);
+        } else if (ev.reason === 'distance') {
+          burst(ev.pos.x, ev.pos.y, 5, '#d8b878', 75, 3, 0.25);
+        }
+        break;
+      case 'brutusRRelease':
+        burst(ev.pos.x, ev.pos.y, 9, '#ffbe3d', 125, 3, 0.34);
+        break;
+      case 'shieldTurn':
+        ring(ev.pos.x, ev.pos.y, 31, '#ffd76b', 0.28);
+        burst(ev.pos.x, ev.pos.y, 8, '#fff0a0', 115, 2.8, 0.30);
+        break;
+      case 'shieldReturn':
+        ring(ev.pos.x, ev.pos.y, 25, '#ffbe3d', 0.20);
+        burst(ev.pos.x, ev.pos.y, 5, '#ffffff', 80, 2.4, 0.22);
         break;
       case 'zoneStart':
         ring(ev.pos.x, ev.pos.y, ev.radius, ev.kind === 'solR' ? '#ffd166' : '#c77dff', 0.5);

@@ -98,6 +98,11 @@ function collideWorld(map, pos, r) {
   pos.y = V.clamp(pos.y, r, map.size.h - r);
   const walls = map.walls;
   for (let i = 0; i < walls.length; i++) circleRectResolve(pos, r, walls[i]);
+  // Uma parede que toca a borda pode resolver o círculo para o lado externo
+  // depois do clamp inicial (ex.: Investida para x=-1). Contenha novamente
+  // após todas as paredes para preservar o invariante da arena.
+  pos.x = V.clamp(pos.x, r, map.size.w - r);
+  pos.y = V.clamp(pos.y, r, map.size.h - r);
 }
 
 M.V = V;

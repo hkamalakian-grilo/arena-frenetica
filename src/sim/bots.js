@@ -99,7 +99,9 @@ function offensiveCasts(st, h, target, committing) {
     if (h.qCd <= 0 && committing && d > 100 && d < cfg.q.dashLen + 40) {
       castAt(mind, 'q', V.towards(h.pos, target.pos)); return;
     }
-    if (h.rCd <= 0 && h.ultUnlocked && d < cfg.r.radius * 0.8) { castAt(mind, 'r', h.facing); return; }
+    if (h.rCd <= 0 && h.ultUnlocked && d < cfg.r.range * 0.9) {
+      castAt(mind, 'r', predictDir(st, h, target, cfg.r.projSpeed)); return;
+    }
   } else if (h.hero === 'lyra') {
     if (h.rCd <= 0 && h.ultUnlocked && committing && d < cfg.r.castRange) {
       castAt(mind, 'r', V.towards(h.pos, target.pos), d); return;

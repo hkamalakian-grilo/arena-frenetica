@@ -1,29 +1,60 @@
 /**
- * abilities.js — implementação dos kits (§7): Q e R dos 4 heróis.
- * Habilidades de área têm um pequeno telegraph (st.pending) antes do hit (§13);
- * dashes/projéteis são instantâneos no cast, com telegraph durante a MIRA
- * (desenhado pela camada de input/render, fora da simulação).
+ * abilities.js — núcleo e registro dos kits.
+ * Cada herói registra Q/R em src/sim/abilities/<heroi>.js, evitando um switch
+ * central e permitindo que duas pessoas adicionem conteúdo com menos conflito.
  */
 (function () {
 'use strict';
 const M = globalThis.MOBA = globalThis.MOBA || {};
 const { V } = M;
+const kits = Object.create(null);
+const pendingHandlers = Object.create(null);
+const pendingCancelHandlers = Object.create(null);
 
-function heroCfg(h) { return M.BAL.heroes[h.hero]; }
+function heroCfg(hero) { return M.BAL.heroes[hero.hero]; }
 
-// Quick cast (tap §11): mira no inimigo válido mais próximo visível; senão, facing
+function register(heroId, handlers) {
+  if (!M.BAL.heroes[heroId]) throw new Error(`Herói desconhecido no registro: ${heroId}`);
+  if (!handlers || typeof handlers.q !== 'function' || typeof handlers.r !== 'function') {
+    throw new Error(`Kit incompleto para ${heroId}`);
+  }
+  kits[heroId] = handlers;
+}
+
+function registerPending(type, handler, cancelHandler) {
+  if (!type || typeof handler !== 'function') throw new Error('Resolver pendente inválido');
+  pendingHandlers[type] = handler;
+  if (cancelHandler !== undefined) {
+    if (typeof cancelHandler !== 'function') throw new Error('Invalid pending cancellation');
+    pendingCancelHandlers[type] = cancelHandler;
+  }
+}
+
+function interruptPending(st, hero, reason) {
+  let interrupted = false;
+  for (let index = st.pending.length - 1; index >= 0; index--) {
+    const pending = st.pending[index];
+    if (pending.followId !== hero.id || !pendingCancelHandlers[pending.type]) continue;
+    st.pending.splice(index, 1);
+    pendingCancelHandlers[pending.type](st, pending, hero, reason);
+    interrupted = true;
+  }
+  return interrupted;
+}
+
+// Quick cast: mira no inimigo válido mais próximo visível; senão, facing.
 function autoAimPoint(st, hero) {
   let best = null, bd = Infinity;
-  for (const e of st.heroes) {
-    if (e.team === hero.team || !e.alive || !e.visTo[hero.team]) continue;
-    const d = V.dist(hero.pos, e.pos);
-    if (d < bd) { bd = d; best = e; }
+  for (const enemy of st.heroes) {
+    if (enemy.team === hero.team || !enemy.alive || !enemy.visTo[hero.team]) continue;
+    const d = V.dist(hero.pos, enemy.pos);
+    if (d < bd) { bd = d; best = enemy; }
   }
   if (!best) {
-    for (const e of st.minions) {
-      if (e.team === hero.team || !e.alive || !e.visTo[hero.team]) continue;
-      const d = V.dist(hero.pos, e.pos);
-      if (d < bd) { bd = d; best = e; }
+    for (const enemy of st.minions) {
+      if (enemy.team === hero.team || !enemy.alive || !enemy.visTo[hero.team]) continue;
+      const d = V.dist(hero.pos, enemy.pos);
+      if (d < bd) { bd = d; best = enemy; }
     }
   }
   if (best) return { dir: V.towards(hero.pos, best.pos), dist: bd };
@@ -32,144 +63,87 @@ function autoAimPoint(st, hero) {
 
 function autoAimDir(st, hero) { return autoAimPoint(st, hero).dir; }
 
-// Alvo do R do Nix: herói inimigo visível em alcance, preferindo o mirado
 function nixRTarget(st, hero, dir) {
-  const R = heroCfg(hero).r;
+  const ability = heroCfg(hero).r;
   let best = null, bestScore = -Infinity;
-  for (const e of st.heroes) {
-    if (e.team === hero.team || !e.alive || !e.visTo[hero.team] || e.invulnT > 0) continue;
-    const d = V.dist(hero.pos, e.pos);
-    if (d > R.range) continue;
-    const to = V.towards(hero.pos, e.pos);
-    const align = to.x * dir.x + to.y * dir.y;   // -1..1
-    const score = align * 200 - d * 0.5 - (e.hp / e.maxHp) * 100;
-    if (score > bestScore) { bestScore = score; best = e; }
+  for (const enemy of st.heroes) {
+    if (enemy.team === hero.team || !enemy.alive || !enemy.visTo[hero.team] || enemy.invulnT > 0) continue;
+    const d = V.dist(hero.pos, enemy.pos);
+    if (d > ability.range) continue;
+    const to = V.towards(hero.pos, enemy.pos);
+    const align = to.x * dir.x + to.y * dir.y;
+    const score = align * 200 - d * 0.5 - (enemy.hp / enemy.maxHp) * 100;
+    if (score > bestScore) { bestScore = score; best = enemy; }
   }
   return best;
 }
 
-// Ponto de cast de zona: posição mirada clampada ao alcance
 function zonePoint(hero, dir, dist, castRange) {
   const d = V.clamp(dist !== undefined ? dist : castRange, 0, castRange);
   return { x: hero.pos.x + dir.x * d, y: hero.pos.y + dir.y * d };
 }
 
-/**
- * Tenta castar. slot: 'q'|'r'. aim: { dir:{x,y}, dist? } (dist = distância
- * arrastada, p/ zonas). Retorna true se castou (e aplica cooldown).
- */
 function cast(st, hero, slot, aim) {
-  if (!hero.alive || hero.stunT > 0 || hero.dash) return false;
+  if (!hero.alive || hero.stunT > 0 || hero.dash || hero.aaWindup || hero.actionLockT > 0) return false;
   if (slot === 'q' && hero.qCd > 0) return false;
   if (slot === 'r' && (hero.rCd > 0 || !hero.ultUnlocked)) return false;
+
+  const kit = kits[hero.hero];
+  const handler = kit && kit[slot];
+  if (typeof handler !== 'function') return false;
+
   const cfg = heroCfg(hero);
   let dir, aimDist = aim ? aim.dist : undefined;
   if (aim && aim.dir && (aim.dir.x || aim.dir.y)) dir = V.norm(aim.dir.x, aim.dir.y);
   else {
-    const ap = autoAimPoint(st, hero);
-    dir = ap.dir;
-    if (aimDist === undefined) aimDist = ap.dist;
-  }
-  const A = slot === 'q' ? cfg.q : cfg.r;
-  const key = hero.hero + '_' + slot;
-  let ok = true;
-
-  switch (key) {
-    case 'brutus_q':
-      hero.dash = { type: 'brutusQ', dir, remaining: A.dashLen, speed: A.dashSpeed,
-                    dmg: A.dmg, stun: A.stun, hit: false };
-      break;
-    case 'brutus_r':
-      st.pending.push({ type: 'brutusR', followId: hero.id, pos: { ...hero.pos },
-                        radius: A.radius, t: A.tele, team: hero.team, srcId: hero.id });
-      break;
-    case 'lyra_q':
-      st.projectiles.push({
-        id: st.nextId++, ptype: 'lyraQ', team: hero.team, srcId: hero.id,
-        pos: { ...hero.pos }, prevPos: { ...hero.pos }, dir, speed: A.projSpeed,
-        remaining: A.range, width: A.width, dmg: A.dmg, hitIds: [], alive: true,
-      });
-      break;
-    case 'lyra_r': {
-      const p = zonePoint(hero, dir, aimDist, A.castRange);
-      st.pending.push({ type: 'lyraR', pos: p, radius: A.radius, t: A.tele,
-                        team: hero.team, srcId: hero.id });
-      break;
-    }
-    case 'nix_q': {
-      const dest = { x: hero.pos.x + dir.x * A.blinkLen, y: hero.pos.y + dir.y * A.blinkLen };
-      M.geo.collideWorld(st.map, dest, hero.radius);
-      st.events.push({ type: 'blink', from: { ...hero.pos }, to: { ...dest }, heroId: hero.id });
-      hero.pos.x = dest.x; hero.pos.y = dest.y;
-      hero.prevPos.x = dest.x; hero.prevPos.y = dest.y;   // sem interpolar teleporte
-      hero.empowerT = A.bonusWindow;
-      break;
-    }
-    case 'nix_r': {
-      const target = nixRTarget(st, hero, dir);
-      if (!target) { ok = false; break; }
-      hero.dash = { type: 'nixR', targetId: target.id, speed: A.dashSpeed,
-                    dmg: A.dmg, execHpPct: A.execHpPct };
-      break;
-    }
-    case 'sol_q':
-      st.projectiles.push({
-        id: st.nextId++, ptype: 'solQ', team: hero.team, srcId: hero.id,
-        pos: { ...hero.pos }, prevPos: { ...hero.pos }, dir, speed: A.projSpeed,
-        remaining: A.range, width: A.width, dmg: A.dmg, heal: A.heal, alive: true,
-      });
-      break;
-    case 'sol_r': {
-      const p = zonePoint(hero, dir, aimDist, A.castRange);
-      st.pending.push({ type: 'solR', pos: p, radius: A.radius, t: A.tele,
-                        team: hero.team, srcId: hero.id });
-      break;
-    }
-    default: ok = false;
+    const auto = autoAimPoint(st, hero);
+    dir = auto.dir;
+    if (aimDist === undefined) aimDist = auto.dist;
   }
 
+  const ability = slot === 'q' ? cfg.q : cfg.r;
+  const ok = handler({ st, hero, ability, dir, aimDist }) !== false;
   if (!ok) return false;
+
   hero.facing = dir;
-  hero.revealT = M.BAL.bush.revealOnAction;    // castar revela no bush (§4)
+  hero.revealT = M.BAL.bush.revealOnAction;
   if (slot === 'q') hero.qCd = cfg.q.cd;
   else hero.rCd = cfg.r.cd * (st.phase === 'sudden' ? M.BAL.match.sdUltCdFactor : 1);
-  st.events.push({ type: 'cast', heroId: hero.id, hero: hero.hero, slot, pos: { ...hero.pos }, dir });
+  st.events.push({ type: 'cast', heroId: hero.id, hero: hero.hero, slot,
+                   pos: { ...hero.pos }, dir });
   return true;
 }
 
-// Telegraphs pendentes expiram → efeito real (chamado pelo step)
 function resolvePending(st, dt) {
   for (let i = st.pending.length - 1; i >= 0; i--) {
-    const p = st.pending[i];
-    if (p.followId !== undefined) {           // Terremoto segue o Brutus
-      const h = st.heroes.find(x => x.id === p.followId);
-      if (h && h.alive) { p.pos.x = h.pos.x; p.pos.y = h.pos.y; }
-      else { st.pending.splice(i, 1); continue; }   // morreu castando: cancela
-    }
-    p.t -= dt;
-    if (p.t > 0) continue;
-    st.pending.splice(i, 1);
-    if (p.type === 'brutusR') {
-      const A = M.BAL.heroes.brutus.r;
-      const src = st.heroes.find(x => x.id === p.srcId);
-      st.events.push({ type: 'aoeHit', pos: { ...p.pos }, radius: p.radius, kind: 'brutusR' });
-      for (const u of M.combat.enemyUnitsIn(st, p.team, p.pos, p.radius)) {
-        M.combat.dealDamage(st, src, u, A.dmg, 'ult');
-        if (u.kind === 'hero') M.combat.applySlow(u, A.slowPct, A.slowDur);
+    const pending = st.pending[i];
+    if (pending.followId !== undefined) {
+      const hero = st.heroes.find(candidate => candidate.id === pending.followId);
+      if (hero && hero.alive) {
+        pending.pos.x = hero.pos.x; pending.pos.y = hero.pos.y;
+      } else {
+        st.pending.splice(i, 1);
+        continue;
       }
-    } else if (p.type === 'lyraR') {
-      const A = M.BAL.heroes.lyra.r;
-      st.zones.push({ id: st.nextId++, ztype: 'lyraR', pos: p.pos, radius: p.radius,
-                      team: p.team, srcId: p.srcId, tLeft: A.dur, tickT: A.tick });
-      st.events.push({ type: 'zoneStart', pos: { ...p.pos }, radius: p.radius, kind: 'lyraR' });
-    } else if (p.type === 'solR') {
-      const A = M.BAL.heroes.sol.r;
-      st.zones.push({ id: st.nextId++, ztype: 'solR', pos: p.pos, radius: p.radius,
-                      team: p.team, srcId: p.srcId, tLeft: A.dur, tickT: A.tick });
-      st.events.push({ type: 'zoneStart', pos: { ...p.pos }, radius: p.radius, kind: 'solR' });
     }
+
+    pending.t -= dt;
+    if (pending.t > 0) continue;
+    st.pending.splice(i, 1);
+    const handler = pendingHandlers[pending.type];
+    if (handler) handler(st, pending);
   }
 }
 
-M.abilities = { cast, autoAimDir, nixRTarget, resolvePending };
+M.abilities = {
+  register,
+  registerPending,
+  cast,
+  autoAimDir,
+  nixRTarget,
+  zonePoint,
+  resolvePending,
+  interruptPending,
+  _kits: kits,
+};
 })();

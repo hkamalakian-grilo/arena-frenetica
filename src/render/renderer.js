@@ -68,8 +68,9 @@ const ART_FILES = {
   tex_dirt: 'assets/textures/dirt.png',
   tex_stone: 'assets/textures/stone.png',
   sk_aa: 'assets/skills/aa.png',
-  sk_investida: 'assets/skills/investida.png',
-  sk_terremoto: 'assets/skills/terremoto.png',
+  sk_investida_brutus: 'assets/skills/investida_brutus.png',
+  sk_escudo_bumerangue: 'assets/skills/escudo_bumerangue.png',
+  brutus_shield_projectile: 'assets/heroes/brutus_shield_projectile.png',
   sk_flecha: 'assets/skills/flecha.png',
   sk_chuva: 'assets/skills/chuva.png',
   sk_passo: 'assets/skills/passo.png',
@@ -117,6 +118,33 @@ function init(canvas) {
  */
 function drawHeroArt(c, heroId, cx, cy, bodyH, opts) {
   const o = opts || {};
+  const anim = o.entity && M.animations ? M.animations.frame(o.entity) : null;
+  if (anim) {
+    const H = bodyH * anim.scale, Wd = H * (anim.sw / anim.sh);
+    const baseAlpha = o.alpha !== undefined ? o.alpha : 1;
+    const paintSample = (sample, alpha) => {
+      if (!sample || alpha <= 0) return;
+      const sampleH = bodyH * sample.scale;
+      const sampleW = sampleH * (sample.sw / sample.sh);
+      c.save();
+      c.translate(cx, cy - sampleH * sample.bob);
+      c.scale((sample.flip ? -1 : 1) * sample.scaleX, sample.scaleY);
+      c.globalAlpha = alpha * (1 - sample.blend);
+      c.drawImage(sample.img, sample.sx, sample.sy, sample.sw, sample.sh,
+                  -sampleW / 2, -sampleH * sample.footAnchor, sampleW, sampleH);
+      if (sample.nextSy !== null && sample.blend > 0) {
+        c.globalAlpha = alpha * sample.blend;
+        c.drawImage(sample.img, sample.sx, sample.nextSy, sample.sw, sample.sh,
+                    -sampleW / 2, -sampleH * sample.footAnchor, sampleW, sampleH);
+      }
+      c.restore();
+    };
+    const transition = anim.previous
+      ? Math.max(0, Math.min(1, anim.transitionBlend || 0)) : 1;
+    if (anim.previous) paintSample(anim.previous, baseAlpha * (1 - transition));
+    paintSample(anim, baseAlpha * transition);
+    return { topY: cy - H * (anim.footAnchor + anim.bob), cxV: cx };
+  }
   const spr = R.sprites[heroId];
   if (spr && spr.ready) {
     const H = bodyH, Wd = H * spr.ar;
@@ -1010,19 +1038,23 @@ function render(st, alpha, opts) {
   }
 
   for (const h of st.heroes) {
-    if (!h.alive) continue;
+    if (!h.alive && !(M.animations && M.animations.shouldRender(h.id))) continue;
     if (h.team !== pt && !h.visTo[pt]) continue;   // invisível no bush (§4)
     const p = ip(h, alpha);
-    list.push({ sy: p.y + 4, fn: () => {
+    const playerPriority = player && h.id === player.id ? 2 : 1;
+    list.push({ sy: p.y + 4, priority: playerPriority, fn: () => {
       const cfg = M.BAL.heroes[h.hero];
       const isPlayer = player && h.id === player.id;
       const inBushAlly = h.team === pt && h.bushIdx >= 0;
       const moving = Math.abs(h.pos.x - h.prevPos.x) + Math.abs(h.pos.y - h.prevPos.y) > 0.06;
-      const bob = moving ? Math.abs(Math.sin(now * 10 + h.id * 1.7)) * 3 : 0;
+      // Brutus already has authored vertical motion in every clip. Applying the
+      // legacy sine bob on top made his feet float and recreated the old bounce.
+      const authoredAnimation = M.animations && M.animations.shouldRender(h.id);
+      const bob = !authoredAnimation && moving ? Math.abs(Math.sin(now * 10 + h.id * 1.7)) * 3 : 0;
       const atkK = Math.max(0, (h.aaCd / (cfg.aa.period || 1)) - 0.8) / 0.2;
       const puff = 1 + atkK * 0.12;
       const bodyH = h.radius * SPRITE_SCALE;
-      const footY = gY(p.y) + h.radius * 0.16 - bob;   // "pés" no chão (com o pulinho)
+      const footY = gY(p.y) + h.radius * 0.16 - bob;
       c.globalAlpha = inBushAlly ? 0.55 : 1;
 
       if (isPlayer && h.bushIdx >= 0 && !h.visTo[1 - pt]) {   // "estou oculto" (§12)
@@ -1033,16 +1065,23 @@ function render(st, alpha, opts) {
         c.setLineDash([]);
         c.globalAlpha = inBushAlly ? 0.55 : 1;
       }
+      if (isPlayer) {
+        c.globalAlpha = 0.85;
+        c.lineWidth = 3; c.strokeStyle = '#8bc5ff';
+        c.beginPath(); c.ellipse(p.x, footY + 2, h.radius + 9, (h.radius + 9) * 0.46, 0, 0, Math.PI * 2); c.stroke();
+        c.globalAlpha = inBushAlly ? 0.55 : 1;
+      }
       if (h.invulnT > 0) {
         c.lineWidth = 3; c.strokeStyle = 'rgba(255,255,255,0.85)';
         c.beginPath(); c.ellipse(p.x, footY, h.radius + 11, (h.radius + 11) * 0.48, 0, 0, Math.PI * 2); c.stroke();
       }
 
       const art = drawHeroArt(c, h.hero, p.x, footY, bodyH, {
-        faceLeft: h.facing.x < -0.12, puff, glow: isPlayer,
+        faceLeft: h.facing.x < -0.12, puff, glow: false,
         alpha: inBushAlly ? 0.55 : 1, id: h.id, now, atkK, facing: h.facing,
-        team: h.team, chargeK: 1 - Math.min(1, h.aaCd / (cfg.aa.period || 1)) });
+        team: h.team, entity: h, chargeK: 1 - Math.min(1, h.aaCd / (cfg.aa.period || 1)) });
       const headY = art.topY + bodyH * 0.06;
+      if (!h.alive) { c.globalAlpha = 1; return; }
 
       if (h.stunT > 0) {
         for (let i = 0; i < 3; i++) {
@@ -1086,7 +1125,31 @@ function render(st, alpha, opts) {
     const p = { x: V.lerp(pr.prevPos.x, pr.pos.x, alpha), y: V.lerp(pr.prevPos.y, pr.pos.y, alpha) };
     list.push({ sy: p.y, fn: () => {
       const py = gY(p.y) - PROJ_Z;
-      if (pr.ptype === 'lyraQ') {
+      if (pr.ptype === 'brutusR') {
+        const shieldArt = artOk('brutus_shield_projectile') ? R.art.brutus_shield_projectile : null;
+        c.save();
+        c.globalAlpha = 0.48;
+        c.strokeStyle = pr.returning ? '#fff0a0' : '#ffad28';
+        c.lineWidth = 8; c.lineCap = 'round';
+        c.beginPath();
+        c.moveTo(p.x - pr.dir.x * 7, py - pr.dir.y * TILT * 7);
+        c.lineTo(p.x - pr.dir.x * 36, py - pr.dir.y * TILT * 36);
+        c.stroke();
+        c.globalAlpha = 1;
+        c.translate(p.x, py);
+        c.rotate(st.time * 13 * (pr.returning ? -1 : 1));
+        if (shieldArt) {
+          c.drawImage(shieldArt.img, -24, -24, 48, 48);
+        } else {
+          c.fillStyle = '#d97718'; c.strokeStyle = '#ffbf2f'; c.lineWidth = 3;
+          c.beginPath(); c.arc(0, 0, 15, 0, Math.PI * 2); c.fill(); c.stroke();
+          c.strokeStyle = '#9da6ad'; c.lineWidth = 2;
+          c.beginPath(); c.arc(0, 0, 9, 0, Math.PI * 2); c.stroke();
+          c.fillStyle = '#ffbf2f';
+          c.beginPath(); c.arc(0, 0, 4, 0, Math.PI * 2); c.fill();
+        }
+        c.restore();
+      } else if (pr.ptype === 'lyraQ') {
         c.save(); c.translate(p.x, py); c.rotate(Math.atan2(pr.dir.y * TILT, pr.dir.x));
         c.fillStyle = INK; c.fillRect(-15, -3.5, 30, 7);
         c.fillStyle = '#d3ffd9'; c.fillRect(-14, -2.5, 28, 5);
@@ -1116,7 +1179,9 @@ function render(st, alpha, opts) {
     } });
   }
 
-  list.sort((a, b) => a.sy - b.sy);
+  // Equal-depth overlaps are common at spawn. Keep the controlled hero on top
+  // so its silhouette and facing never disappear behind the allied bot.
+  list.sort((a, b) => (a.sy - b.sy) || ((a.priority || 0) - (b.priority || 0)));
   for (const d of list) d.fn();
 
   // ========== PASSO 4: folhagem dos bushes (cobre os pés de quem está dentro) ==========
@@ -1213,7 +1278,7 @@ function drawAim(c, st, h, aim) {
   else if (key === 'nix_q') {
     line(cfg.q.blinkLen, 8);
     circleAt(h.pos.x + d.x * cfg.q.blinkLen, h.pos.y + d.y * cfg.q.blinkLen, 26);
-  } else if (key === 'brutus_r') circleAt(h.pos.x, h.pos.y, cfg.r.radius);
+  } else if (key === 'brutus_r') line(cfg.r.range, cfg.r.width + 8);
   else if (key === 'lyra_r') {
     const dist = Math.min(aim.dist, cfg.r.castRange);
     circleAt(h.pos.x + d.x * dist, h.pos.y + d.y * dist, cfg.r.radius, cfg.r.castRange);
@@ -1303,7 +1368,7 @@ function drawHud(c, st, opts, now) {
 
   const L = M.controls.layout();
   // ícones pintados por habilidade (fallback: letra, ex.: Execução do Nix)
-  const SKI = { brutus: ['investida', 'terremoto'], lyra: ['flecha', 'chuva'],
+  const SKI = { brutus: ['investida_brutus', 'escudo_bumerangue'], lyra: ['flecha', 'chuva'],
                 nix: ['passo', null], sol: ['orbe', 'zona'] };
   const ski = SKI[player.hero] || [null, null];
   const ic = (k) => (k && artOk('sk_' + k)) ? R.art['sk_' + k] : null;

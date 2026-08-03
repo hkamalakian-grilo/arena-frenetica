@@ -152,7 +152,9 @@ function onDeath(st, u, src, creditHero) {
   } else if (u.kind === 'hero') {
     u.deaths++;
     u.respawnT = respawnTime(st);
-    u.dash = null; u.stunT = 0; u.slowT = 0; u.empowerT = 0;
+    u.dash = null; u.aaWindup = null; u.actionLockT = 0;
+    u.stunT = 0; u.slowT = 0; u.empowerT = 0;
+    u.moveVel.x = 0; u.moveVel.y = 0;
     const enemyTeam = 1 - u.team;
     st.teamKills[enemyTeam]++;
     let killerId = -1;
@@ -197,6 +199,42 @@ function endMatch(st, winner, reason) {
   st.events.push({ type: 'end', winner, reason });
 }
 
+function validMeleeTarget(st, hero, target, aa) {
+  if (!target || !target.alive || target.team === hero.team) return false;
+  if (target.kind === 'hero' && target.invulnT > 0) return false;
+  if ((target.kind === 'tower' || target.kind === 'base') && !M.structureAttackable(st, target)) return false;
+  const grace = aa.rangeGrace || 0;
+  if (V.dist(hero.pos, target.pos) > aa.range + target.radius + grace) return false;
+  if ((target.kind === 'hero' || target.kind === 'minion') &&
+      geo.losBlocked(st.map, hero.pos, target.pos)) return false;
+  return true;
+}
+
+function resolveMeleeAttack(st, hero, cfg, pending) {
+  const target = findUnit(st, pending.targetId);
+  if (!validMeleeTarget(st, hero, target, cfg.aa)) {
+    st.events.push({ type: 'aaMiss', heroId: hero.id, targetId: pending.targetId,
+                     pos: { x: hero.pos.x, y: hero.pos.y } });
+    return;
+  }
+  hero.facing = V.towards(hero.pos, target.pos);
+  dealDamage(st, hero, target, cfg.aa.dmg, 'aa');
+  if (hero.empowerT > 0) {
+    dealDamage(st, hero, target, M.BAL.heroes.nix.q.bonusDmg, 'ability');
+    hero.empowerT = 0;
+    st.events.push({ type: 'aoeHit', pos: { x: target.pos.x, y: target.pos.y },
+                     radius: 34, kind: 'nixEmpower' });
+  }
+  st.events.push({ type: 'aaHit', heroId: hero.id, targetId: target.id,
+                   pos: { x: target.pos.x, y: target.pos.y }, melee: true });
+}
+
+function finishBrutusDash(st, hero, reason) {
+  hero.dash = null;
+  st.events.push({ type: 'brutusQEnd', heroId: hero.id, reason,
+                   pos: { x: hero.pos.x, y: hero.pos.y } });
+}
+
 // ---------- heróis ----------
 
 function updateHero(st, h, cmd) {
@@ -209,6 +247,7 @@ function updateHero(st, h, cmd) {
   h.revealT = Math.max(0, h.revealT - DT);
   h.invulnT = Math.max(0, h.invulnT - DT);
   h.empowerT = Math.max(0, h.empowerT - DT);
+  h.actionLockT = Math.max(0, (h.actionLockT || 0) - DT);
 
   if (!h.alive) {
     h.respawnT -= DT;
@@ -216,6 +255,8 @@ function updateHero(st, h, cmd) {
       h.alive = true; h.hp = h.maxHp;
       h.pos.x = h.spawn.x; h.pos.y = h.spawn.y;
       h.prevPos.x = h.spawn.x; h.prevPos.y = h.spawn.y;
+      h.moveVel.x = 0; h.moveVel.y = 0;
+      h.aaWindup = null; h.actionLockT = 0;
       h.invulnT = M.BAL.respawn.invuln;
       st.events.push({ type: 'respawn', heroId: h.id, pos: { x: h.pos.x, y: h.pos.y } });
     }
@@ -234,8 +275,47 @@ function updateHero(st, h, cmd) {
     }
   } else h.fntT = 0;
 
+  // Ataques corpo a corpo têm antecipação real. O dano acontece no quadro
+  // de contato, e não antes de o braço começar a se mover.
+  if (h.aaWindup) {
+    h.moveVel.x = 0; h.moveVel.y = 0;
+    if (h.stunT > 0) {
+      st.events.push({ type: 'aaCancel', heroId: h.id, reason: 'stun' });
+      h.aaWindup = null;
+      return;
+    }
+    const trackedTarget = findUnit(st, h.aaWindup.targetId);
+    if (trackedTarget && trackedTarget.alive && trackedTarget.team !== h.team) {
+      // A protected anticipation remains planted, but Brutus may pivot to
+      // follow a target circling inside melee range. Final validity and damage
+      // are still decided only at the authored contact tick below.
+      h.facing = V.towards(h.pos, trackedTarget.pos);
+    }
+    h.aaWindup.t -= DT;
+    if (h.aaWindup.t <= 0) {
+      const pending = h.aaWindup;
+      h.aaWindup = null;
+      resolveMeleeAttack(st, h, cfg, pending);
+    }
+    return;
+  }
+
+  // Interrupt authored pre-release actions on the first stunned tick. Their
+  // pending callbacks are removed here, so they cannot launch later as ghosts.
+  if (h.stunT > 0 && M.abilities.interruptPending(st, h, 'stun')) {
+    h.moveVel.x = 0; h.moveVel.y = 0;
+    return;
+  }
+
+  // O corpo fica plantado durante a preparação do arremesso do escudo.
+  if (h.actionLockT > 0) {
+    h.moveVel.x = 0; h.moveVel.y = 0;
+    return;
+  }
+
   // dash em andamento
   if (h.dash) {
+    h.moveVel.x = 0; h.moveVel.y = 0;
     const d = h.dash;
     d.t = (d.t || 0) + DT;
     if (d.type === 'brutusQ') {
@@ -254,11 +334,12 @@ function updateHero(st, h, cmd) {
         dealDamage(st, h, first, d.dmg, 'ability');
         if (first.alive && first.kind !== 'tower' && first.kind !== 'base') first.stunT = Math.max(first.stunT || 0, d.stun);
         st.events.push({ type: 'aoeHit', pos: { x: first.pos.x, y: first.pos.y }, radius: 40, kind: 'brutusQhit' });
-        h.dash = null;
-      } else if (d.remaining <= 0 || hitWall) h.dash = null;
+        finishBrutusDash(st, h, 'hit');
+      } else if (d.remaining <= 0) finishBrutusDash(st, h, 'distance');
+      else if (hitWall) finishBrutusDash(st, h, 'wall');
     } else if (d.type === 'nixR') {
       const tgt = st.heroes.find(x => x.id === d.targetId);
-      if (!tgt || !tgt.alive || d.t > 0.7) { h.dash = null; }
+      if (!tgt || !tgt.alive || d.t > (d.maxT || 0.7)) { h.dash = null; }
       else {
         const dir = V.towards(h.pos, tgt.pos);
         h.pos.x += dir.x * d.speed * DT; h.pos.y += dir.y * d.speed * DT;
@@ -275,41 +356,73 @@ function updateHero(st, h, cmd) {
     return;   // dash ignora movimento/cast/AA neste tick
   }
 
-  if (h.stunT > 0) return;
+  if (h.stunT > 0) {
+    h.moveVel.x = 0; h.moveVel.y = 0;
+    return;
+  }
 
   // cast pedido pelo comando (jogador ou bot)
   if (cmd.cast) M.abilities.cast(st, h, cmd.cast.slot, cmd.cast);
 
-  if (h.dash) return;   // cast pode ter iniciado dash
+  if (h.actionLockT > 0) {
+    h.moveVel.x = 0; h.moveVel.y = 0;
+    return;   // o próprio cast pode ter iniciado uma antecipação plantada
+  }
+
+  if (h.dash) {
+    h.moveVel.x = 0; h.moveVel.y = 0;
+    return;   // cast pode ter iniciado dash
+  }
 
   // movimento (com deslize de quina: bater de frente numa parede não trava —
   // contorna pela quina mais próxima; feedback do playtest humano no Mapa B)
   const mv = V.clampLen(cmd.move.x, cmd.move.y, 1);
   const spd = cfg.speed * (h.slowT > 0 ? 1 - h.slowPct : 1);
-  if (mv.x || mv.y) {
+  const moveCfg = M.BAL.movement;
+  const hasInput = V.len(mv.x, mv.y) > 0.01;
+  const targetVx = hasInput ? mv.x * spd : 0;
+  const targetVy = hasInput ? mv.y * spd : 0;
+  const reversing = hasInput && h.moveVel.x * targetVx + h.moveVel.y * targetVy < 0;
+  const responseTime = !hasInput ? moveCfg.brakeTime : (reversing ? moveCfg.reverseTime : moveCfg.accelTime);
+  const dvx = targetVx - h.moveVel.x, dvy = targetVy - h.moveVel.y;
+  const deltaLen = V.len(dvx, dvy);
+  const maxDelta = spd / Math.max(0.01, responseTime) * DT;
+  if (deltaLen <= maxDelta || deltaLen < 1e-6) {
+    h.moveVel.x = targetVx; h.moveVel.y = targetVy;
+  } else {
+    h.moveVel.x += dvx / deltaLen * maxDelta;
+    h.moveVel.y += dvy / deltaLen * maxDelta;
+  }
+
+  const travelSpeed = V.len(h.moveVel.x, h.moveVel.y);
+  if (travelSpeed > 0.05) {
     const bx = h.pos.x, by = h.pos.y;
-    h.pos.x += mv.x * spd * DT;
-    h.pos.y += mv.y * spd * DT;
+    h.pos.x += h.moveVel.x * DT;
+    h.pos.y += h.moveVel.y * DT;
     geo.collideWorld(st.map, h.pos, h.radius);
-    const want = spd * DT * V.len(mv.x, mv.y);
+    const want = travelSpeed * DT;
     if (V.len(h.pos.x - bx, h.pos.y - by) < want * 0.35) {
-      const probe = { x: bx + mv.x * (spd * DT + h.radius), y: by + mv.y * (spd * DT + h.radius) };
+      const travelDir = V.norm(h.moveVel.x, h.moveVel.y);
+      const probe = { x: bx + travelDir.x * (travelSpeed * DT + h.radius),
+                      y: by + travelDir.y * (travelSpeed * DT + h.radius) };
       for (const w of st.map.walls) {
         if (geo.pointInRect(probe, w, h.radius * 0.7)) {
           let tx = 0, ty = 0;
-          if (Math.abs(mv.x) >= Math.abs(mv.y)) {
+          if (Math.abs(travelDir.x) >= Math.abs(travelDir.y)) {
             ty = (by - w.y) < (w.y + w.h - by) ? -1 : 1;   // quina mais próxima
           } else {
             tx = (bx - w.x) < (w.x + w.w - bx) ? -1 : 1;
           }
-          h.pos.x = bx + tx * spd * DT;
-          h.pos.y = by + ty * spd * DT;
+          const slideSpeed = travelSpeed * moveCfg.wallSlide;
+          h.moveVel.x = tx * slideSpeed; h.moveVel.y = ty * slideSpeed;
+          h.pos.x = bx + h.moveVel.x * DT;
+          h.pos.y = by + h.moveVel.y * DT;
           geo.collideWorld(st.map, h.pos, h.radius);
           break;
         }
       }
     }
-    if (V.len(mv.x, mv.y) > 0.15) h.facing = V.norm(mv.x, mv.y);
+    if (travelSpeed > spd * 0.08) h.facing = V.norm(h.moveVel.x, h.moveVel.y);
   }
 
   // auto-ataque com auto-aim (§7): herói com menor HP% > minion/dragão > estrutura
@@ -356,14 +469,14 @@ function updateHero(st, h, cmd) {
           targetId: target.id, speed: aa.projSpeed, dmg: aa.dmg, alive: true,
         });
         st.events.push({ type: 'aaShot', heroId: h.id, pos: { x: h.pos.x, y: h.pos.y } });
+      } else if (aa.windup > 0) {
+        const variant = h.hero === 'brutus' ? h.aaVariant++ % 2 : 0;
+        h.aaWindup = { t: aa.windup, targetId: target.id, variant };
+        h.moveVel.x = 0; h.moveVel.y = 0;
+        st.events.push({ type: 'aaWindup', heroId: h.id, targetId: target.id,
+                         variant, duration: aa.windup, pos: { x: h.pos.x, y: h.pos.y } });
       } else {
-        dealDamage(st, h, target, aa.dmg, 'aa');
-        if (h.empowerT > 0) {   // Passo Sombrio: AA reforçado (§7)
-          dealDamage(st, h, target, M.BAL.heroes.nix.q.bonusDmg, 'ability');
-          h.empowerT = 0;
-          st.events.push({ type: 'aoeHit', pos: { x: target.pos.x, y: target.pos.y }, radius: 34, kind: 'nixEmpower' });
-        }
-        st.events.push({ type: 'aaHit', pos: { x: target.pos.x, y: target.pos.y }, melee: true });
+        resolveMeleeAttack(st, h, cfg, { targetId: target.id });
       }
     }
   }
@@ -371,9 +484,22 @@ function updateHero(st, h, cmd) {
 
 // ---------- minions ----------
 
-function laneWaypoints(st, lane, team) {
-  const wps = st.map.lanes[lane].waypoints;
-  return team === 0 ? wps : [...wps].reverse();
+function minionObjective(st, m) {
+  // Minions têm uma função deliberadamente simples e legível: empurrar a
+  // própria lane. Eles ignoram heróis e outros minions, caminham diretamente
+  // até a próxima torre liberada e, depois dela, até a base.
+  const towers = st.towers.filter(t =>
+    t.team !== m.team && t.lane === m.lane && t.alive && M.structureAttackable(st, t));
+  if (towers.length) {
+    let best = towers[0], bestDist = V.dist(m.pos, best.pos);
+    for (let i = 1; i < towers.length; i++) {
+      const d = V.dist(m.pos, towers[i].pos);
+      if (d < bestDist) { best = towers[i]; bestDist = d; }
+    }
+    return best;
+  }
+  const base = st.bases.find(b => b.team !== m.team && b.alive);
+  return base && M.structureAttackable(st, base) ? base : null;
 }
 
 function updateMinion(st, m) {
@@ -383,35 +509,8 @@ function updateMinion(st, m) {
   m.revealT = Math.max(0, m.revealT - DT);
   if (m.stunT > 0) return;
 
-  // valida alvo atual
-  let tgt = m.targetId >= 0 ? findUnit(st, m.targetId) : null;
-  if (tgt && (!tgt.alive ||
-      (tgt.kind === 'hero' && !tgt.visTo[m.team]) ||
-      ((tgt.kind === 'tower' || tgt.kind === 'base') && !M.structureAttackable(st, tgt)) ||
-      V.dist(m.pos, tgt.pos) > M.BAL.minion.leash)) {
-    tgt = null; m.targetId = -1;
-  }
-
-  // adquire: inimigo mais próximo em percepção (estrutura, minion ou herói) (§6)
-  if (!tgt) {
-    let bd = M.BAL.minion.aggroRadius;
-    for (const e of st.minions) {
-      if (e.team === m.team || !e.alive) continue;
-      const d = V.dist(m.pos, e.pos);
-      if (d < bd) { bd = d; tgt = e; }
-    }
-    for (const e of st.heroes) {
-      if (e.team === m.team || !e.alive || !e.visTo[m.team] || e.invulnT > 0) continue;
-      const d = V.dist(m.pos, e.pos);
-      if (d < bd) { bd = d; tgt = e; }
-    }
-    for (const s of [...st.towers, ...st.bases]) {
-      if (s.team === m.team || !s.alive || !M.structureAttackable(st, s)) continue;
-      const d = V.dist(m.pos, s.pos) - s.radius;
-      if (d < bd) { bd = d; tgt = s; }
-    }
-    m.targetId = tgt ? tgt.id : -1;
-  }
+  const tgt = minionObjective(st, m);
+  m.targetId = tgt ? tgt.id : -1;
 
   if (tgt) {
     const reach = B.range + m.radius + (tgt.radius || 0);
@@ -430,17 +529,6 @@ function updateMinion(st, m) {
           pos: { x: m.pos.x, y: m.pos.y }, prevPos: { x: m.pos.x, y: m.pos.y },
           targetId: tgt.id, speed: B.projSpeed, dmg: m.dmg, alive: true,
         });
-      }
-    }
-  } else {
-    // avança pela lane (§6)
-    const wps = laneWaypoints(st, m.lane, m.team);
-    if (m.wp < wps.length) {
-      const wp = wps[m.wp];
-      if (V.dist(m.pos, wp) < 34) m.wp++;
-      else {
-        const dir = V.towards(m.pos, wp);
-        m.pos.x += dir.x * B.speed * DT; m.pos.y += dir.y * B.speed * DT;
       }
     }
   }
@@ -618,6 +706,61 @@ function updateProjectiles(st) {
         st.events.push({ type: 'aaHit', pos: { x: tgt.pos.x, y: tgt.pos.y }, melee: false,
                          tower: p.ptype === 'tower' });
         p.alive = false;
+      }
+      continue;
+    }
+
+    // Escudo Bumerangue do Brutus: acerta na ida e retorna ao dono.
+    if (p.ptype === 'brutusR') {
+      const source = st.heroes.find(h => h.id === p.srcId);
+      if (!source || !source.alive) { p.alive = false; continue; }
+
+      if (p.catching) {
+        p.catchT = Math.max(0, p.catchT - DT);
+        const ratio = p.catchDuration > 0 ? p.catchT / p.catchDuration : 0;
+        p.pos.x = source.pos.x + p.catchOffset.x * ratio;
+        p.pos.y = source.pos.y + p.catchOffset.y * ratio;
+        if (p.catchT <= 0) {
+          p.alive = false;
+          st.events.push({ type: 'shieldReturn', heroId: source.id, pos: { ...source.pos } });
+        }
+        continue;
+      }
+
+      if (p.returning) {
+        const dir = V.towards(p.pos, source.pos);
+        const stepLen = p.speed * DT;
+        p.pos.x += dir.x * stepLen; p.pos.y += dir.y * stepLen;
+        p.dir = dir;
+        if (V.dist(p.pos, source.pos) <= source.radius + p.width * 0.2) {
+          p.catching = true;
+          p.catchDuration = 0.2;
+          p.catchT = p.catchDuration;
+          p.catchOffset = { x: p.pos.x - source.pos.x, y: p.pos.y - source.pos.y };
+          st.events.push({ type: 'shieldCatchStart', heroId: source.id,
+                           pos: { ...source.pos }, dir: { ...dir } });
+        }
+        continue;
+      }
+
+      const stepLen = Math.min(p.speed * DT, p.remaining);
+      p.pos.x += p.dir.x * stepLen; p.pos.y += p.dir.y * stepLen;
+      p.remaining -= stepLen;
+      for (const u of enemyUnitsIn(st, p.team, p.pos, p.width / 2)) {
+        if (p.hitIds.includes(u.id)) continue;
+        p.hitIds.push(u.id);
+        dealDamage(st, source, u, p.dmg, 'ult');
+        if (u.kind === 'hero') applySlow(u, p.slowPct, p.slowDur);
+        st.events.push({ type: 'aoeHit', pos: { ...u.pos }, radius: 42, kind: 'brutusRhit' });
+      }
+
+      let turnBack = p.remaining <= 0;
+      for (const wall of st.map.walls) {
+        if (geo.pointInRect(p.pos, wall, p.width / 2)) { turnBack = true; break; }
+      }
+      if (turnBack) {
+        p.returning = true;
+        st.events.push({ type: 'shieldTurn', pos: { ...p.pos }, heroId: source.id });
       }
       continue;
     }

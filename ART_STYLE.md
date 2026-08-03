@@ -71,7 +71,7 @@ Herói 1.0x · Torre 3.0x · Dragão 6.0x · Árvore 2.5x · Ponte 2.5x · Arbus
 - [ ] Rochas soltas (opcional) · [ ] Ponte pintada (hoje é desenhada por código)
 
 ### Ícones de habilidade (frontal, circular, símbolo chapado) — GLOBAIS (todos os mapas)
-- [x] Ataque Básico · [x] Investida · [x] Terremoto ✅ nos botões
+- [x] Ataque Básico · [x] Investida · [x] Escudo Bumerangue ✅ nos botões
 - [x] Flecha Perfurante · [x] Chuva de Flechas ✅
 - [x] Passo Sombrio · [ ] **Execução (FALTA — R do Nix usa a letra por enquanto)**
 - [x] Orbe Solar · [x] Zona Radiante ✅

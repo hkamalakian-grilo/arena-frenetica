@@ -1,0 +1,148 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/brutus_controller.gd" id="2_brutus"]
+[ext_resource type="Script" path="res://scripts/virtual_joystick.gd" id="3_joystick"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_brutus"]
+radius = 0.42
+height = 1.72
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1_main")
+
+[node name="Brutus" type="CharacterBody3D" parent="."]
+script = ExtResource("2_brutus")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Brutus"]
+position = Vector3(0, 0.86, 0)
+shape = SubResource("CapsuleShape_brutus")
+
+[node name="CameraRig" type="Node3D" parent="."]
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+position = Vector3(0, 36, 9.65)
+rotation_degrees = Vector3(-75, 0, 0)
+projection = 1
+size = 35.5
+far = 200.0
+current = true
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-55, -35, 0)
+light_color = Color(1, 0.91, 0.72, 1)
+light_energy = 1.45
+shadow_enabled = true
+
+[node name="FillLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-35, 145, 0)
+light_color = Color(0.42, 0.63, 1, 1)
+light_energy = 0.45
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Title" type="Label" parent="HUD"]
+visible = false
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 28.0
+offset_bottom = 82.0
+theme_override_colors/font_color = Color(1, 0.83, 0.3, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.7)
+theme_override_constants/shadow_offset_x = 3
+theme_override_constants/shadow_offset_y = 3
+theme_override_font_sizes/font_size = 34
+text = "BRUTUS — MOVIMENTO 360°"
+horizontal_alignment = 1
+
+[node name="Hint" type="Label" parent="HUD"]
+visible = false
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 84.0
+offset_bottom = 126.0
+theme_override_colors/font_color = Color(0.88, 0.93, 0.84, 1)
+theme_override_font_sizes/font_size = 20
+text = "Analógico máximo corre • Q Investida • R Arremesso"
+horizontal_alignment = 1
+
+[node name="Speed" type="Label" parent="HUD"]
+visible = false
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -330.0
+offset_right = 270.0
+offset_bottom = -290.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.72)
+theme_override_font_sizes/font_size = 18
+text = "Velocidade: 0%"
+
+[node name="VirtualJoystick" type="Control" parent="HUD"]
+layout_mode = 3
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = -270.0
+offset_right = 278.0
+offset_bottom = -10.0
+mouse_filter = 0
+script = ExtResource("3_joystick")
+
+[node name="AttackButton" type="Button" parent="HUD"]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -180.0
+offset_top = -190.0
+offset_right = -38.0
+offset_bottom = -48.0
+theme_override_colors/font_color = Color(1, 0.86, 0.45, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "ATAQUE"
+
+[node name="QButton" type="Button" parent="HUD"]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -330.0
+offset_top = -176.0
+offset_right = -204.0
+offset_bottom = -50.0
+theme_override_colors/font_color = Color(1, 0.72, 0.24, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "Q  INVESTIDA"
+
+[node name="RButton" type="Button" parent="HUD"]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -184.0
+offset_top = -340.0
+offset_right = -38.0
+offset_bottom = -212.0
+theme_override_colors/font_color = Color(0.85, 0.58, 1, 1)
+theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "R  ARREMESSO"
+
+[node name="Prototype" type="Label" parent="HUD"]
+visible = false
+anchors_preset = 12
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -42.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.46)
+theme_override_font_sizes/font_size = 15
+text = "Brutus autoral 3D • modelo, rig e animações próprios"
+horizontal_alignment = 1

@@ -1,5 +1,9 @@
 # Arena Frenética — mini-MOBA 2v2
 
+> **Alpha 1:** o mapa oficial e padrão é C — Travessia. Brutus inaugura o sistema de animação em oito direções lógicas. Consulte [ALPHA_1.md](ALPHA_1.md).
+
+> **Vertical slice 3D:** a fonte autoral está em `godot/brutus_3d`; o jogo Canvas usa 19 atlases exportados desse modelo, com dez estados, oito direções reais e variantes sem escudo.
+
 Protótipo jogável de MOBA 2v2 mobile-first no browser: **3 minutos** de partida + até 2 de morte
 súbita, mapa 100% visível (sem câmera de rolagem), **visão inclinada 2.5D** estilo Brawl Stars
 (objetos com altura e profundidade), kits enxutos (ataque + Q + ultimate) e ritmo frenético.
@@ -48,7 +52,7 @@ em tempo real via WebAudio — sem arquivos de áudio. O som destrava no primeir
 
 | Herói | Papel | Q | R (destrava no nível 4) |
 |---|---|---|---|
-| **Brutus** ⬡ | Tanque | Investida: dash + atordoa | Terremoto: dano em área + lentidão |
+| **Brutus** ⬡ | Tanque | Investida: corrida protegida + atordoa | Escudo Bumerangue: arremesso, lentidão e retorno |
 | **Lyra** ◇ | Atiradora | Flecha Perfurante (atravessa minions) | Chuva de Flechas: área contínua |
 | **Nix** ▲ | Assassino | Passo Sombrio: teleporte + próximo golpe reforçado | Execução: dano dobrado abaixo de 35% |
 | **Sol** ● | Suporte | Orbe Solar: fere inimigo OU cura aliado | Zona Radiante: cura + frenesi + revela |
@@ -60,9 +64,11 @@ index.html              ponto de entrada (2 cliques)
 src/config/balance.js   TODAS as constantes de balanceamento
 src/config/maps/        Mapa A "Coliseu" e Mapa B "Encruzilhada" (data-driven)
 src/sim/                simulação pura e determinística (60 Hz, roda sem browser)
+src/sim/abilities/      kits Q/R independentes de Brutus, Lyra, Nix e Sol
 src/input/              joystick virtual, botões touch, teclado/mouse
 src/render/             Canvas 2D: mapa, entidades, HUD, partículas
 src/main.js             game loop (timestep fixo + render interpolado) e telas
+godot/brutus_3d/        vertical slice 3D do Brutus em Godot
 ```
 
 - `BALANCE_NOTES.md` — playtests automatizados, mudanças de balanceamento e comparativo dos mapas.

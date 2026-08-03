@@ -101,6 +101,13 @@ const SFX = {
   castQ()    { noise({ dur: 0.13, filter: 2400, filterSlideTo: 320, vol: 0.10 }); },
   castR()    { noise({ dur: 0.28, filter: 2800, filterSlideTo: 220, vol: 0.13 });
                tone({ freq: 64, type: 'sawtooth', dur: 0.34, vol: 0.10 }); },
+  chargeImpact(){ noise({ dur: 0.13, filter: 620, vol: 0.15 });
+                  tone({ freq: 92, slideTo: 48, type: 'square', dur: 0.16, vol: 0.11 }); },
+  shieldThrow(){ noise({ dur: 0.16, filter: 3400, filterSlideTo: 680, vol: 0.09 });
+                 tone({ freq: 520, slideTo: 230, type: 'triangle', dur: 0.18, vol: 0.07 }); },
+  shieldTurn(){ tone({ freq: 430, slideTo: 820, type: 'triangle', dur: 0.13, vol: 0.075 }); },
+  shieldCatch(){ tone({ freq: 310, slideTo: 185, type: 'square', dur: 0.09, vol: 0.07 });
+                 noise({ dur: 0.06, filter: 1250, vol: 0.055 }); },
   aoeHit()   { tone({ freq: 95, slideTo: 46, dur: 0.18, vol: 0.16 }); noise({ dur: 0.14, filter: 800, vol: 0.12 }); },
   exec()     { tone({ freq: 880, slideTo: 110, type: 'sawtooth', dur: 0.3, vol: 0.11 });
                noise({ dur: 0.2, filter: 1200, vol: 0.12 }); },
@@ -152,9 +159,15 @@ function ingest(st, events) {
       case 'towerShot': if (gate('twS', 70)) SFX.towerShot(); break;
       case 'cast': if (ev.slot === 'r') SFX.castR(); else if (gate('castQ', 50)) SFX.castQ(); break;
       case 'aoeHit':
-        if (ev.kind === 'nixExec') SFX.exec();
+        if (ev.kind === 'brutusQhit') SFX.chargeImpact();
+        else if (ev.kind === 'brutusRhit') { if (gate('shieldHit', 70)) SFX.aaMelee(); }
+        else if (ev.kind === 'nixExec') SFX.exec();
         else if (gate('aoe', 60)) SFX.aoeHit();
         break;
+      case 'brutusQEnd': if (ev.reason === 'wall') SFX.chargeImpact(); break;
+      case 'brutusRRelease': SFX.shieldThrow(); break;
+      case 'shieldTurn': if (gate('shieldTurn', 90)) SFX.shieldTurn(); break;
+      case 'shieldReturn': if (gate('shieldCatch', 90)) SFX.shieldCatch(); break;
       case 'blink': SFX.blink(); break;
       case 'zoneStart': SFX.zone(); break;
       case 'dmg': if (ev.cat === 'heal' && ev.targetKind === 'hero' && gate('heal', 220)) SFX.heal(); break;
