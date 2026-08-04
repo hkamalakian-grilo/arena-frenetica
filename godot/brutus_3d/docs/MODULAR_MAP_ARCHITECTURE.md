@@ -14,19 +14,21 @@ TravessiaMap
 ├── TerrainLayer
 │   └── TerrainArt
 ├── StaticProps
-│   └── TowerPlatforms
+│   ├── TowerPlatforms
+│   └── JungleModules
+│       └── UpperLeftCamp
 ├── DynamicProps
 │   └── DragonAccessBridges (criado durante a partida)
 ├── FloorCollision
 └── ArenaBounds
 ```
 
-- `TerrainLayer`: usa `travessia_terrain_v3.png`, sem as quatro plataformas das
+- `TerrainLayer`: usa `travessia_terrain_v4.png`, sem as quatro plataformas das
   torres de lane. A textura permanece visualmente canônica, mas é aplicada a
-  uma malha subdividida e deslocada por `travessia_depth_v1.png`, produzindo
+  uma malha subdividida e deslocada por `travessia_depth_v2.png`, produzindo
   relevo 2.5D sem reinventar a arte.
 - `StaticProps`: contém objetos separados que permanecem durante a partida. As
-  plataformas das torres são montadas aqui a partir dos marcadores canônicos.
+  plataformas das torres e o primeiro acampamento de jungle são montados aqui.
 - `DynamicProps`: contém objetos que surgem, desaparecem ou animam, como as
   pontes do dragão.
 - Colisões continuam independentes da imagem e das camadas visuais.
@@ -59,11 +61,17 @@ restaura a posição original.
 ## Assets
 
 - `travessia_clean_v1.png`: referência artística original preservada.
-- `travessia_terrain_v3.png`: terreno de produção sem plataformas de lane e com
-  o corredor lateral do acampamento superior esquerdo liberado.
-- `travessia_depth_v1.png`: mapa de altura alinhado à textura de produção.
+- `travessia_terrain_v4.png`: chão de produção com o acampamento superior
+  esquerdo removido para receber o módulo independente.
+- `travessia_depth_v2.png`: mapa de altura do chão, sem duplicar o relevo do módulo.
+- `upper_left_camp_v1.png`: pixels originais do acampamento com máscara alfa.
+- `upper_left_camp_depth_v1.png`: relevo exclusivo do primeiro acampamento.
+- `upper_left_camp_ground_ai_v1.png`: referência de grama usada somente sob a
+  máscara do módulo; lanes, ponte e pixels externos não são consumidos.
 - `tools/build_travessia_depth.gd`: geração determinística do mapa de altura a
   partir dos pixels aprovados; não usa geração criativa nem redesenha objetos.
+- `tools/build_upper_left_camp_module.gd`: reconstrói os quatro assets da primeira
+  separação de jungle de forma repetível.
 - `tower_platform_v1.png`: plataforma modular transparente.
 - `scenes/world/modular_bridge_3d.tscn`: cena de ponte 3D reutilizável. Comprimento,
   direção e largura são configuráveis; o piso é gerado por quatro fileiras

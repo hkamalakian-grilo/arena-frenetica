@@ -62,10 +62,20 @@ func _run() -> void:
 	var height_texture := terrain_material.get_shader_parameter("height_texture") \
 		as Texture2D
 	assert(terrain_texture.resource_path.ends_with(
-		"travessia_terrain_v3.png"),
+		"travessia_terrain_v4.png"),
 		"Travessia 2.5D must keep the approved terrain artwork")
-	assert(height_texture.resource_path.ends_with("travessia_depth_v1.png"),
+	assert(height_texture.resource_path.ends_with("travessia_depth_v2.png"),
 		"Travessia 2.5D must use the aligned authored height map")
+	var upper_left_camp := game.get_node(
+		"TravessiaMap/StaticProps/JungleModules/UpperLeftCamp") \
+		as MeshInstance3D
+	assert(upper_left_camp != null,
+		"The first separated jungle camp module must exist")
+	var camp_material := upper_left_camp.material_override as ShaderMaterial
+	var camp_texture := camp_material.get_shader_parameter("camp_texture") \
+		as Texture2D
+	assert(camp_texture.resource_path.ends_with("upper_left_camp_v1.png"),
+		"The separated camp must use untouched pixels from the approved map")
 	assert(game.get_node("TravessiaMap/StaticProps/TowerPlatforms").get_child_count() == 4,
 		"Every lane tower must have an independent movable platform")
 	assert(game.get_node("TravessiaMap/DynamicProps") is Node3D,
