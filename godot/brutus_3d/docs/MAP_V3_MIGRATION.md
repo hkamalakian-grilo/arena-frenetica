@@ -1,37 +1,30 @@
-# Travessia V3 — migração para mapa 3D modular
+# Travessia V3 — migração concluída para mapa 2.5D modular
 
-## Decisão
+## Resultado
 
-A Travessia será tecnicamente 3D, com câmera ortográfica fixa e jogabilidade no
-plano X/Z. A composição do mapa aprovado permanece como gabarito visual, mas a
-imagem única deixa de ser a implementação definitiva.
+A migração técnica foi concluída. A partida não usa mais a imagem única do mapa
+como piso. Água, terrenos, lanes, praças de base, ilha, plataformas, pontes,
+muralhas, margens, clareiras, vegetação e âncoras são módulos independentes.
 
-## Primeiro componente concluído
+A composição da arte original continua sendo a referência para direção visual,
+mas agora pode ser refinada peça por peça sem comprometer a física.
 
-`ModularBridge3D` estabelece o padrão para novos elementos do cenário:
+## Etapas concluídas
 
-- uma única cena reutilizável para qualquer ponte;
-- dimensões e direção configuráveis por dados;
-- fileiras do tabuleiro como geometria independente;
-- colisão separada da apresentação;
-- montagem animada sem esticar imagens;
-- textura, rejunte e luz extraídos das pontes aprovadas do próprio mapa.
+1. Terrenos norte e sul e caminhos reconstruídos como malhas independentes.
+2. Rio substituído por um plano de água com material procedural animado.
+3. Pontes laterais e acessos do dragão instanciados de `ModularBridge3D`.
+4. Ilha, muralhas, margens e entradas reconstruídas com peças reutilizáveis.
+5. Vegetação, rochas e clareiras separadas em módulos instanciados.
+6. Seis plataformas e âncoras de gameplay desacopladas do visual.
+7. PNG completo removido do caminho de renderização da partida.
+8. Testes de combate, física, habilidades e evento do dragão mantidos verdes.
 
-Os dois acessos usam quatro fileiras completas de três pedras, repetindo os
-cursos de alvenaria da ponte lateral sem esticar a arte. O tabuleiro visual tem
-a mesma proporção das pontes existentes; a colisão permanece mais larga e
-independente. No acesso norte, uma correção sutil de perspectiva aumenta a
-largura em direção à ilha. As extremidades avançam ligeiramente sob as bordas
-existentes para não deixar água ou emendas aparentes.
+## Estado de arte
 
-## Próximas etapas
+Esta entrega resolve a arquitetura e produz uma primeira linguagem visual
+coerente e editável. O polimento futuro deverá trocar materiais e módulos
+individualmente, mantendo a mesma árvore e as mesmas âncoras. Não é necessário
+reconstruir novamente o sistema do mapa para melhorar a aparência.
 
-1. Criar terreno base e caminhos como malhas modulares.
-2. Substituir o rio pintado por água e margens 3D.
-3. Instanciar `ModularBridge3D` também nas pontes laterais.
-4. Reconstruir ilha, muralhas e entradas com peças reutilizáveis.
-5. Migrar vegetação e rochas para cenas instanciadas e otimizadas.
-6. Remover o PNG de gabarito quando a comparação visual da V3 for aprovada.
-
-Até a etapa 6, a imagem atual continua por baixo da geometria como referência de
-posição. Isso permite migrar sem interromper os testes de combate e objetivo.
+Consulte `MODULAR_MAP_ARCHITECTURE.md` para as regras permanentes.
