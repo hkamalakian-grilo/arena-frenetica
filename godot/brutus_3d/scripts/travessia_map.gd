@@ -6,6 +6,7 @@ extends Node3D
 ## replaced by authored terrain, vegetation and props without rewriting rules.
 
 const TERRAIN_ART := preload("res://assets/maps/travessia_terrain_v3.png")
+const TERRAIN_DEPTH := preload("res://assets/maps/travessia_depth_v1.png")
 const TOWER_PLATFORM_ART := preload("res://assets/maps/tower_platform_v1.png")
 const MODULAR_BRIDGE_SCENE := preload(
 	"res://scenes/world/modular_bridge_3d.tscn")
@@ -54,16 +55,45 @@ func _add_terrain_art() -> void:
 	map_art.name = "TerrainArt"
 	var mesh := PlaneMesh.new()
 	mesh.size = TravessiaDefinition.MAP_SIZE
+	# Enough vertices for the authored height map to raise forests, walls,
+	# rocks and the dragon island without changing the approved texture.
+	mesh.subdivide_width = 95
+	mesh.subdivide_depth = 191
 	map_art.mesh = mesh
-	var material := StandardMaterial3D.new()
-	material.albedo_texture = TERRAIN_ART
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode cull_disabled, unshaded;
+
+uniform sampler2D terrain_texture : source_color, filter_linear_mipmap_anisotropic;
+uniform sampler2D height_texture : filter_linear;
+uniform float height_scale = 0.62;
+
+void vertex() {
+	float authored_height = textureLod(height_texture, UV, 0.0).r;
+	VERTEX.y += authored_height * height_scale;
+}
+
+void fragment() {
+	vec4 approved_art = texture(terrain_texture, UV);
+	ALBEDO = approved_art.rgb;
+	ALPHA = approved_art.a;
+}
+"""
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("terrain_texture", TERRAIN_ART)
+	material.set_shader_parameter("height_texture", TERRAIN_DEPTH)
+	material.set_shader_parameter("height_scale", 0.62)
 	map_art.material_override = material
 	map_art.position.y = 0.002
 	map_art.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	map_art.set_meta("presentation", &"canonical_2_5d")
 	terrain_layer.add_child(map_art)
+
+
+func uses_canonical_2_5d_art() -> bool:
+	return true
 
 
 func _add_tower_platforms() -> void:

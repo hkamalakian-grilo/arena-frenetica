@@ -22,7 +22,9 @@ TravessiaMap
 ```
 
 - `TerrainLayer`: usa `travessia_terrain_v3.png`, sem as quatro plataformas das
-  torres de lane.
+  torres de lane. A textura permanece visualmente canônica, mas é aplicada a
+  uma malha subdividida e deslocada por `travessia_depth_v1.png`, produzindo
+  relevo 2.5D sem reinventar a arte.
 - `StaticProps`: contém objetos separados que permanecem durante a partida. As
   plataformas das torres são montadas aqui a partir dos marcadores canônicos.
 - `DynamicProps`: contém objetos que surgem, desaparecem ou animam, como as
@@ -59,6 +61,9 @@ restaura a posição original.
 - `travessia_clean_v1.png`: referência artística original preservada.
 - `travessia_terrain_v3.png`: terreno de produção sem plataformas de lane e com
   o corredor lateral do acampamento superior esquerdo liberado.
+- `travessia_depth_v1.png`: mapa de altura alinhado à textura de produção.
+- `tools/build_travessia_depth.gd`: geração determinística do mapa de altura a
+  partir dos pixels aprovados; não usa geração criativa nem redesenha objetos.
 - `tower_platform_v1.png`: plataforma modular transparente.
 - `scenes/world/modular_bridge_3d.tscn`: cena de ponte 3D reutilizável. Comprimento,
   direção e largura são configuráveis; o piso é gerado por quatro fileiras
@@ -67,9 +72,12 @@ restaura a posição original.
   original. Cada curso preserva pedras, rejunte, paleta e iluminação das pontes
   aprovadas, sem alongamento de textura.
 
-## Limite atual
+## Estratégia 2.5D permanente
 
-As quatro plataformas das torres de lane e as pontes do dragão já são
-modulares. A ponte é o primeiro componente real da Travessia V3. Terreno, água,
-margens, pontes laterais, vegetação e muralhas ainda usam a imagem antiga como
-gabarito e serão migrados por etapas conforme `MAP_V3_MIGRATION.md`.
+O cenário imutável usa uma representação híbrida: aparência canônica em textura
+e profundidade física em geometria. Isso evita perder identidade visual durante
+a migração. Elementos que precisam mudar durante a partida — estruturas,
+plataformas, personagens, ovo, dragão e pontes dinâmicas — permanecem separados.
+
+Refinamentos futuros devem melhorar o mapa de altura ou extrair uma camada da
+própria arte. Não se deve substituir o mapa por um greybox procedural.

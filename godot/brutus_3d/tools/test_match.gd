@@ -49,11 +49,23 @@ func _run() -> void:
 		"Complete-map presentation must not follow and crop around Brutus")
 	var terrain_art := game.get_node(
 		"TravessiaMap/TerrainLayer/TerrainArt") as MeshInstance3D
-	assert(terrain_art != null, "Travessia modular terrain layer is missing")
-	var terrain_material := terrain_art.material_override as StandardMaterial3D
-	assert(terrain_material.albedo_texture.resource_path.ends_with(
+	assert(terrain_art != null, "Travessia 2.5D terrain layer is missing")
+	assert(game.get_node("TravessiaMap").uses_canonical_2_5d_art(),
+		"Travessia must preserve the approved artwork in its 2.5D presentation")
+	var terrain_mesh := terrain_art.mesh as PlaneMesh
+	assert(terrain_mesh != null and terrain_mesh.subdivide_width >= 95 \
+		and terrain_mesh.subdivide_depth >= 191,
+		"Travessia terrain must have enough geometry for authored relief")
+	var terrain_material := terrain_art.material_override as ShaderMaterial
+	var terrain_texture := terrain_material.get_shader_parameter("terrain_texture") \
+		as Texture2D
+	var height_texture := terrain_material.get_shader_parameter("height_texture") \
+		as Texture2D
+	assert(terrain_texture.resource_path.ends_with(
 		"travessia_terrain_v3.png"),
-		"Travessia must use the terrain-only modular artwork")
+		"Travessia 2.5D must keep the approved terrain artwork")
+	assert(height_texture.resource_path.ends_with("travessia_depth_v1.png"),
+		"Travessia 2.5D must use the aligned authored height map")
 	assert(game.get_node("TravessiaMap/StaticProps/TowerPlatforms").get_child_count() == 4,
 		"Every lane tower must have an independent movable platform")
 	assert(game.get_node("TravessiaMap/DynamicProps") is Node3D,

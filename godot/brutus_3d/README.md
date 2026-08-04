@@ -20,7 +20,8 @@ final é este projeto Godot e não precisa reproduzir as limitações visuais do
 - R — Escudo Bumerangue: giro de tronco, escudo destacável, voo, impacto e retorno; cooldown de 35 s.
 - Câmera MOBA ortográfica inclinada em 55°.
 - Controles por WASD, setas e analógico virtual.
-- Travessia em retrato com terreno, plataformas de torre e elementos dinâmicos em camadas modulares.
+- Travessia em retrato com apresentação 2.5D fiel à arte aprovada: textura
+  canônica sobre malha subdividida e relevo alinhado por mapa de altura.
 - Renderizador `gl_compatibility`, adequado ao primeiro alvo mobile/web.
 
 ## Como executar
@@ -46,6 +47,9 @@ godot --path godot/brutus_3d
 - `assets/maps/travessia_clean_v1.png`: referência artística original preservada.
 - `assets/maps/travessia_terrain_v3.png`: terreno modular usado pela partida,
   incluindo o corredor lateral liberado no acampamento superior esquerdo.
+- `assets/maps/travessia_depth_v1.png`: relevo 2.5D derivado pixel a pixel da
+  arte canônica; levanta florestas, muralhas, rochas e a ilha sem redesenhá-las.
+- `tools/build_travessia_depth.gd`: reconstrói deterministicamente o mapa de altura.
 - `assets/maps/tower_platform_v1.png`: plataforma independente das torres de lane.
 - `docs/MODULAR_MAP_ARCHITECTURE.md`: regras para editar e ampliar o mapa sem repintá-lo.
 - `PRODUCTION_ROADMAP.md`: ordem de construção até a alpha jogável.
