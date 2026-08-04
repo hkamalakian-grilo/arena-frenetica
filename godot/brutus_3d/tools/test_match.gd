@@ -47,36 +47,24 @@ func _run() -> void:
 		"Portrait camera must preserve vertical safety around the main towers")
 	assert(not game.follow_player_camera,
 		"Complete-map presentation must not follow and crop around Brutus")
-	var modular_map := game.get_node("TravessiaMap") as TravessiaMap
-	assert(not modular_map.uses_composite_map_art(),
-		"Travessia must not depend on a complete painted-map bitmap")
-	assert(game.get_node("TravessiaMap/TerrainModules") is Node3D,
-		"Travessia modular terrain layer is missing")
-	assert(game.get_node_or_null("TravessiaMap/TerrainModules/TerrainArt") == null,
-		"Legacy composite terrain artwork must not be instantiated")
-	var module_counts := modular_map.get_module_counts()
-	assert(int(module_counts.terrain) >= 5 and int(module_counts.static_props) >= 6,
-		"Travessia must be assembled from independent terrain and prop modules")
-	assert(game.get_node(
-		"TravessiaMap/StaticModules/StructurePlatforms").get_child_count() == 6,
-		"All lane and main towers must have independent movable platforms")
-	assert(game.get_node("TravessiaMap/DynamicModules") is Node3D,
-		"Travessia dynamic-module layer is missing")
-	var static_bridges := game.get_node(
-		"TravessiaMap/StaticModules/StaticBridgeModules")
-	assert(static_bridges.get_child_count() == 2,
-		"Both lane bridges must be independent modules")
-	for bridge_node in static_bridges.get_children():
-		assert(bridge_node is ModularBridge3D \
-			and not (bridge_node as ModularBridge3D).uses_composite_map_art(),
-			"Static bridges must use authored 3D masonry instead of map-image crops")
+	var terrain_art := game.get_node(
+		"TravessiaMap/TerrainLayer/TerrainArt") as MeshInstance3D
+	assert(terrain_art != null, "Travessia modular terrain layer is missing")
+	var terrain_material := terrain_art.material_override as StandardMaterial3D
+	assert(terrain_material.albedo_texture.resource_path.ends_with(
+		"travessia_terrain_v3.png"),
+		"Travessia must use the terrain-only modular artwork")
+	assert(game.get_node("TravessiaMap/StaticProps/TowerPlatforms").get_child_count() == 4,
+		"Every lane tower must have an independent movable platform")
+	assert(game.get_node("TravessiaMap/DynamicProps") is Node3D,
+		"Travessia dynamic-prop layer is missing")
 	assert(TravessiaDefinition.structures().size() == 6,
 		"Travessia data must define two bases and four towers")
 	assert(TravessiaDefinition.LANE_X.size() == 2, "Travessia must define two lanes")
 	assert(TravessiaDefinition.tower_markers().size() == 4,
-		"Travessia must define four modular tower anchors")
+		"Travessia must define four pixel-measured tower platforms")
 	assert(TravessiaDefinition.main_tower_markers().size() == 2,
-		"Travessia must define two modular main-tower anchors")
+		"Travessia must define two pixel-measured main-tower platforms")
 	assert(is_equal_approx(float(game.match_rules.match_duration), 180.0),
 		"Canonical match duration must be three minutes")
 	assert(is_equal_approx(float(game.match_rules.dragon_hatch_remaining), 60.0),
@@ -163,10 +151,6 @@ func _run() -> void:
 	assert(is_equal_approx(enemy_platform.position.x, moved_tower_position.x) \
 		and is_equal_approx(enemy_platform.position.z, moved_tower_position.z),
 		"Tower platform did not move together with its tower")
-	var moved_anchor: Node3D = game.arena_map.get_structure_anchor(enemy_tower_id)
-	assert(moved_anchor != null \
-		and moved_anchor.global_position.is_equal_approx(moved_tower_position),
-		"Gameplay anchor did not move together with its modular platform")
 	assert(game.move_lane_tower(enemy_tower_id, original_tower_position),
 		"Lane tower could not be restored after the modularity check")
 
@@ -178,22 +162,20 @@ func _run() -> void:
 		func(actor: ArenaActor) -> bool: return actor.actor_kind == &"dragon")
 	assert(dragon.size() == 1, "Exactly one dragon must spawn after hatching")
 	assert(game.get_node_or_null(
-		"TravessiaMap/DynamicModules/DragonAccessBridges") != null,
+		"TravessiaMap/DynamicProps/DragonAccessBridges") != null,
 		"Central access bridges were not created during the hatch event")
 	await create_timer(1.5).timeout
 	var north_bridge := game.get_node(
-		"TravessiaMap/DynamicModules/DragonAccessBridges/NorthBridge") \
+		"TravessiaMap/DynamicProps/DragonAccessBridges/NorthBridge") \
 		as ModularBridge3D
 	var south_bridge := game.get_node(
-		"TravessiaMap/DynamicModules/DragonAccessBridges/SouthBridge") \
+		"TravessiaMap/DynamicProps/DragonAccessBridges/SouthBridge") \
 		as ModularBridge3D
 	assert(north_bridge != null and south_bridge != null,
 		"Dragon connections must instantiate the reusable 3D bridge scene")
 	assert(north_bridge.get_row_count() == 4 and south_bridge.get_row_count() == 4,
 		"Both dragon bridges must preserve the approved four-course masonry")
 	for bridge: ModularBridge3D in [north_bridge, south_bridge]:
-		assert(not bridge.uses_composite_map_art(),
-			"Dragon bridge still depends on the old composite map artwork")
 		assert(bridge.is_fully_revealed(),
 			"A modular 3D bridge did not finish assembling toward the dragon")
 		assert(bridge.get_node_or_null("DeckRows") != null,

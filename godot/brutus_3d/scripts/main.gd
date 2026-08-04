@@ -142,10 +142,6 @@ func _spawn_structure(data: Dictionary) -> ArenaActor:
 	var team: int = data.team
 	var damage := 92.0 if kind == &"tower" else 0.0
 	var attack_range := 4.5 if kind == &"tower" else 0.0
-	var spawn_position: Vector3 = data.position
-	var authored_anchor := arena_map.get_structure_anchor(data.id)
-	if authored_anchor != null:
-		spawn_position = authored_anchor.global_position
 	var actor := _spawn_actor({
 		"kind": kind,
 		"team": team,
@@ -154,7 +150,7 @@ func _spawn_structure(data: Dictionary) -> ArenaActor:
 		"attack_range": attack_range,
 		"attack_interval": 1.20,
 		"color": data.color,
-	}, spawn_position)
+	}, data.position)
 	actor.name = String(data.id).to_pascal_case()
 	actor.set_meta("structure_id", data.id)
 	if kind == &"base":

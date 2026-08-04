@@ -301,7 +301,6 @@ func _add_art_sprite(texture_path: String, pixel_size: float, y_position: float)
 	art.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
 	art.pixel_size = pixel_size
 	art.position.y = y_position
-	art.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(art)
 	actor_art = art
 	return art

@@ -264,26 +264,29 @@ static func structures() -> Array[Dictionary]:
 
 
 static func main_tower_markers() -> Array[Dictionary]:
-	# Canonical symmetric anchors of the modular base platforms.
+	# Centers of the two large circular platforms. They are measured separately
+	# because the approved painted map is intentionally not perfectly symmetric.
 	return [
-		{"id": &"red_core", "team": 1,
-			"position": Vector3(0.0, 0, -13.45)},
-		{"id": &"blue_core", "team": 0,
-			"position": Vector3(0.0, 0, 13.45)},
+		{"id": &"red_core", "team": 1, "map_pixel": Vector2(455, 171),
+			"position": Vector3(-0.0296, 0, -13.6257)},
+		{"id": &"blue_core", "team": 0, "map_pixel": Vector2(455, 1502),
+			"position": Vector3(-0.0296, 0, 12.6390)},
 	]
 
 
 static func tower_markers() -> Array[Dictionary]:
-	# Clean anchors replace the former pixel measurements from the composite PNG.
+	# Exact pixel centers measured on the 913x1723 approved map texture and
+	# converted to the 18.02x34 Godot plane. The generated art is intentionally
+	# not forced into mathematical symmetry.
 	return [
-		{"id": &"red_left_tower", "team": 1,
-			"position": Vector3(LANE_X[0], 0, -12.15)},
-		{"id": &"red_right_tower", "team": 1,
-			"position": Vector3(LANE_X[1], 0, -12.15)},
-		{"id": &"blue_left_tower", "team": 0,
-			"position": Vector3(LANE_X[0], 0, 12.15)},
-		{"id": &"blue_right_tower", "team": 0,
-			"position": Vector3(LANE_X[1], 0, 12.15)},
+		{"id": &"red_left_tower", "team": 1, "map_pixel": Vector2(200, 238),
+			"position": Vector3(-5.0626, 0, -12.3035)},
+		{"id": &"red_right_tower", "team": 1, "map_pixel": Vector2(705, 238),
+			"position": Vector3(4.9047, 0, -12.3035)},
+		{"id": &"blue_left_tower", "team": 0, "map_pixel": Vector2(200, 1463),
+			"position": Vector3(-5.0626, 0, 11.8694)},
+		{"id": &"blue_right_tower", "team": 0, "map_pixel": Vector2(705, 1463),
+			"position": Vector3(4.9047, 0, 11.8694)},
 	]
 
 
