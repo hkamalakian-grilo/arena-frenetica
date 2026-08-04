@@ -4,6 +4,8 @@ extends CharacterBody3D
 signal health_changed(current: float, maximum: float)
 signal defeated(actor: ArenaActor)
 
+const MINION_UNIT_AGGRO_RANGE := 4.5
+
 var actor_kind: StringName = &"minion"
 var team := 0
 var max_health := 100.0
@@ -22,6 +24,8 @@ var health_fill: MeshInstance3D
 var health_backdrop: MeshInstance3D
 var actor_art: Sprite3D
 var actor_model: StylizedActor3D
+var egg_root: Node3D
+var egg_time := 0.0
 var body_color := Color.WHITE
 
 
@@ -38,7 +42,8 @@ func configure(data: Dictionary) -> void:
 	body_color = data.get("color", Color.WHITE)
 	name = "%s_Team%d" % [String(actor_kind).capitalize(), team]
 	add_to_group("arena_actors")
-	add_to_group("damageable")
+	if actor_kind != &"dragon_egg":
+		add_to_group("damageable")
 	collision_layer = 2
 	collision_mask = 1
 	_build_visual()
@@ -50,11 +55,11 @@ func get_team() -> int:
 
 
 func is_targetable() -> bool:
-	return not is_defeated
+	return not is_defeated and actor_kind != &"dragon_egg"
 
 
 func take_damage(amount: float) -> void:
-	if is_defeated or is_protected or amount <= 0.0:
+	if is_defeated or is_protected or actor_kind == &"dragon_egg" or amount <= 0.0:
 		return
 	health = maxf(0.0, health - amount)
 	if actor_model != null:
@@ -89,10 +94,18 @@ func _physics_process(delta: float) -> void:
 			clampf(velocity.length() / maxf(move_speed, 0.01), 0.0, 1.0))
 	elif actor_kind == &"tower" or actor_kind == &"dragon":
 		_process_guardian()
+	elif actor_kind == &"dragon_egg" and egg_root != null:
+		egg_time += delta
+		egg_root.rotation.z = sin(egg_time * 1.8) * 0.035
 
 
 func _process_minion() -> void:
-	if not _valid_target(objective) or not _is_structure(objective):
+	# Unidades inimigas proximas sempre interrompem o foco na estrutura. Como o
+	# minion nao sai do eixo da lane, so escolhemos alvos que ele consegue atingir.
+	var nearby_unit := _find_nearest_enemy_unit(MINION_UNIT_AGGRO_RANGE)
+	if nearby_unit != null:
+		objective = nearby_unit
+	elif not _valid_target(objective) or not _is_structure(objective):
 		objective = _find_lane_objective()
 	if objective == null:
 		velocity = Vector3.ZERO
@@ -182,6 +195,29 @@ func _find_lane_objective() -> Node3D:
 	return closest_tower if closest_tower != null else enemy_base
 
 
+func _find_nearest_enemy_unit(max_distance: float) -> Node3D:
+	var closest: Node3D
+	var closest_distance := max_distance
+	for node in get_tree().get_nodes_in_group("damageable"):
+		var candidate := node as Node3D
+		if candidate == null or candidate == self or not _valid_target(candidate):
+			continue
+		if int(candidate.call("get_team")) != 1 - team or _is_structure(candidate):
+			continue
+		var candidate_actor := candidate as ArenaActor
+		if candidate_actor != null and candidate_actor.actor_kind != &"minion":
+			continue
+		# O deslocamento continua reto. Alvos fora desta largura pertencem a
+		# outra lane ou exigiriam que o minion perseguisse lateralmente.
+		if absf(candidate.global_position.x - lane_x) > attack_range + 0.05:
+			continue
+		var distance := _planar_distance(candidate)
+		if distance < closest_distance:
+			closest_distance = distance
+			closest = candidate
+	return closest
+
+
 func _find_nearest_enemy(max_distance: float) -> Node3D:
 	var closest: Node3D
 	var closest_distance := max_distance
@@ -228,14 +264,33 @@ func _build_visual() -> void:
 		actor_model.configure(&"minion", &"soldier", team)
 	elif actor_kind == &"tower":
 		_add_art_sprite("res://assets/structures/tower_crystal_blue_v1.png" if team == 0 \
-			else "res://assets/structures/tower_crystal_red_v1.png", 0.0032, 1.08)
+			else "res://assets/structures/tower_crystal_red_v1.png", 0.00355, 1.24)
 	elif actor_kind == &"base":
-		_add_ground_shadow(3.45)
+		# A fortaleza ocupa o circulo completo, como as torres laterais. O mapa
+		# pintado tem perspectiva assimetrica, portanto cada extremidade usa seu
+		# proprio pivo visual sem mover o marcador ou a colisao de gameplay.
+		_add_ground_shadow(3.55)
+		var main_tower_art_y := 1.62 if team == 0 else 1.45
 		_add_art_sprite("res://assets/structures/main_tower_core_blue_v2.png" if team == 0 \
-			else "res://assets/structures/main_tower_core_red_v2.png", 0.0043, 1.68)
+			else "res://assets/structures/main_tower_core_red_v2.png", 0.0047,
+			main_tower_art_y)
 	elif actor_kind == &"dragon":
 		_add_art_sprite("res://assets/dragon/dragon_purple_v2.png", 0.0030, 1.55)
-	_build_health_bar()
+	elif actor_kind == &"dragon_egg":
+		_build_dragon_egg()
+	if actor_kind != &"dragon_egg":
+		_build_health_bar()
+
+
+func _build_dragon_egg() -> void:
+	egg_root = Node3D.new()
+	egg_root.name = "DragonEgg3D"
+	add_child(egg_root)
+	_add_ground_shadow(1.45)
+	var egg_art := _add_art_sprite(
+		"res://assets/dragon/dragon_egg_purple_v1.png", 0.00210, 1.04)
+	remove_child(egg_art)
+	egg_root.add_child(egg_art)
 
 
 func _add_art_sprite(texture_path: String, pixel_size: float, y_position: float) -> Sprite3D:
@@ -287,6 +342,10 @@ func _build_collision() -> void:
 		shape.radius = 0.92
 		shape.height = 2.15
 		collision.position.y = 1.08
+	elif actor_kind == &"dragon_egg":
+		shape.radius = 0.58
+		shape.height = 1.75
+		collision.position.y = 0.88
 	else:
 		shape.radius = 0.78 if actor_kind == &"tower" else 1.45
 		shape.height = 1.8 if actor_kind == &"tower" else 2.8
@@ -300,7 +359,7 @@ func _build_health_bar() -> void:
 	var height := 1.35 if actor_kind == &"minion" else 3.35
 	if actor_kind == &"base":
 		width = 2.75
-		height = 4.15
+		height = 4.45
 	if actor_kind == &"dragon":
 		width = 3.0
 		height = 3.25

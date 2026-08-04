@@ -20,21 +20,44 @@ func _run() -> void:
 	var brutus := game.get_node("Brutus") as BrutusController
 	assert(brutus != null, "Integrated Brutus is missing")
 	assert(brutus.health == brutus.max_health, "Brutus must start at full health")
-	assert(is_equal_approx(brutus.visual_root.scale.x, 0.72),
+	assert(brutus.collision_layer == 2 and brutus.collision_mask == 1,
+		"Brutus must collide only with the map layer")
+	assert(is_equal_approx(brutus.visual_root.scale.x, 0.56),
 		"Brutus visual must remain proportional to the full-map camera")
+	var brutus_shape := game.get_node("Brutus/CollisionShape3D").shape \
+		as CapsuleShape3D
+	assert(brutus_shape != null and is_equal_approx(brutus_shape.radius, 0.34),
+		"Brutus collision capsule must match his reduced presentation")
 	assert(game.get_node("HUD/BrutusHealth") != null, "Match health HUD is missing")
+	assert(game.get_node("HUD/MatchStatus").text.begins_with("03:00"),
+		"Match countdown must start at 03:00")
 	assert(not game.get_node("HUD/Title").visible and not game.get_node("HUD/Hint").visible \
 		and not game.get_node("HUD/Speed").visible,
 		"Clean mobile HUD must hide instructional text during play")
+	var q_button := game.get_node("HUD/QButton") as Button
+	var q_button_style := q_button.get_theme_stylebox("normal") as StyleBoxFlat
+	assert(q_button.offset_left == -260.0 and q_button.offset_right == -134.0,
+		"Q button must not overlap the lower main tower")
+	assert(q_button_style != null and q_button_style.corner_radius_top_left == 64,
+		"Ability controls must use circular backgrounds instead of dark rectangles")
 	assert(game.get_node("TravessiaMap") is TravessiaMap, "Canonical Travessia map is missing")
 	assert(game.get_node("TravessiaMap/ArenaBounds").get_child_count() == 4,
 		"Travessia must contain four arena boundaries")
-	assert(game.get_node("CameraRig/Camera3D").size >= 34.0,
-		"Portrait camera must frame the complete Travessia map")
+	assert(is_equal_approx(game.get_node("CameraRig/Camera3D").size, 37.0),
+		"Portrait camera must preserve vertical safety around the main towers")
 	assert(not game.follow_player_camera,
 		"Complete-map presentation must not follow and crop around Brutus")
-	assert(game.get_node("TravessiaMap/MapArt") is MeshInstance3D,
-		"Travessia must use the approved clean map artwork")
+	var terrain_art := game.get_node(
+		"TravessiaMap/TerrainLayer/TerrainArt") as MeshInstance3D
+	assert(terrain_art != null, "Travessia modular terrain layer is missing")
+	var terrain_material := terrain_art.material_override as StandardMaterial3D
+	assert(terrain_material.albedo_texture.resource_path.ends_with(
+		"travessia_terrain_v3.png"),
+		"Travessia must use the terrain-only modular artwork")
+	assert(game.get_node("TravessiaMap/StaticProps/TowerPlatforms").get_child_count() == 4,
+		"Every lane tower must have an independent movable platform")
+	assert(game.get_node("TravessiaMap/DynamicProps") is Node3D,
+		"Travessia dynamic-prop layer is missing")
 	assert(TravessiaDefinition.structures().size() == 6,
 		"Travessia data must define two bases and four towers")
 	assert(TravessiaDefinition.LANE_X.size() == 2, "Travessia must define two lanes")
@@ -42,20 +65,28 @@ func _run() -> void:
 		"Travessia must define four pixel-measured tower platforms")
 	assert(TravessiaDefinition.main_tower_markers().size() == 2,
 		"Travessia must define two pixel-measured main-tower platforms")
+	assert(is_equal_approx(float(game.match_rules.match_duration), 180.0),
+		"Canonical match duration must be three minutes")
+	assert(is_equal_approx(float(game.match_rules.dragon_hatch_remaining), 60.0),
+		"Dragon must hatch with one minute remaining")
 	assert(get_nodes_in_group("hero_bots").size() == 3,
 		"The match must include Sol, Lyra and Nix alongside Brutus")
 	for hero_node in get_nodes_in_group("hero_bots"):
 		var hero := hero_node as HeroBot
 		assert(hero != null and hero.visual_model is StylizedActor3D,
 			"Every roster bot must use a real 3D model")
+		assert(hero.collision_layer == 2 and hero.collision_mask == 1,
+			"Hero bots must collide only with the map layer")
 		assert(hero.find_children("*", "Sprite3D", true, false).is_empty(),
 			"Roster heroes must not fall back to camera-facing sprites")
 
 	var actors := get_nodes_in_group("arena_actors")
-	assert(actors.size() >= 11, "Travessia must start with bases, towers, dragon and a wave")
+	assert(actors.size() >= 11, "Travessia must start with bases, towers, egg and a wave")
 	var enemy_tower: ArenaActor
 	var enemy_base: ArenaActor
 	var blue_minion: ArenaActor
+	var red_minion: ArenaActor
+	var dragon_egg: ArenaActor
 	for node in actors:
 		var actor := node as ArenaActor
 		if actor == null:
@@ -66,14 +97,110 @@ func _run() -> void:
 			enemy_base = actor
 		elif actor.team == 0 and actor.actor_kind == &"minion" and blue_minion == null:
 			blue_minion = actor
+		elif actor.team == 1 and actor.actor_kind == &"minion" and red_minion == null:
+			red_minion = actor
+		elif actor.actor_kind == &"dragon_egg":
+			dragon_egg = actor
 	assert(enemy_tower != null and enemy_base != null, "Enemy structures are missing")
-	assert(blue_minion != null, "Initial blue minion is missing")
+	for actor_node in actors:
+		var main_tower := actor_node as ArenaActor
+		if main_tower == null or main_tower.actor_kind != &"base":
+			continue
+		var expected_art_y := 1.62 if main_tower.team == 0 else 1.45
+		assert(main_tower.actor_art != null \
+			and is_equal_approx(main_tower.actor_art.pixel_size, 0.0047) \
+			and is_equal_approx(main_tower.actor_art.position.y, expected_art_y),
+			"Both main towers must fit and remain grounded on their circular markers")
+		assert(is_equal_approx(main_tower.health_backdrop.position.y, 4.45),
+			"Main-tower health bars must follow the corrected visual height")
+	assert(enemy_tower.actor_art != null \
+		and is_equal_approx(enemy_tower.actor_art.pixel_size, 0.00355) \
+		and is_equal_approx(enemy_tower.actor_art.position.y, 1.24),
+		"Lane tower art must fill its platform without moving its ground pivot")
+	assert(blue_minion != null and red_minion != null, "Initial lane minions are missing")
+	assert(blue_minion.collision_layer == 2 and blue_minion.collision_mask == 1,
+		"Minions must collide only with the map layer")
+	assert((blue_minion.collision_mask & brutus.collision_layer) == 0 \
+		and (brutus.collision_mask & blue_minion.collision_layer) == 0,
+		"Characters and minions must not physically collide with each other")
+	assert(dragon_egg != null, "Dragon egg must be present when the match starts")
+	assert(not dragon_egg.is_targetable(), "Dragon egg must not be targetable before hatching")
+	assert(dragon_egg.actor_art != null and dragon_egg.actor_art.texture.resource_path \
+		.ends_with("dragon_egg_purple_v1.png"),
+		"Dragon egg must use the approved transparent authored artwork")
+	assert(is_equal_approx(dragon_egg.actor_art.pixel_size, 0.00210),
+		"Dragon egg artwork must remain proportional to the central island")
+	assert(game.find_children("*", "ArenaActor", true, false).all(
+		func(actor: ArenaActor) -> bool: return actor.actor_kind != &"dragon"),
+		"Dragon must not exist before the egg hatches")
 	assert(blue_minion.actor_model is StylizedActor3D,
 		"Minions must use the reusable 3D actor model")
 	assert(blue_minion.find_children("*", "MeshInstance3D", true, false).size() >= 8,
 		"Minion 3D model is incomplete")
 
+	var enemy_tower_id: StringName = enemy_tower.get_meta("structure_id", &"")
+	var enemy_platform: Node3D = game.arena_map.get_tower_platform(enemy_tower_id)
+	assert(enemy_tower_id != &"" and enemy_platform != null,
+		"Lane tower is not linked to its modular platform")
+	var original_tower_position := enemy_tower.global_position
+	var moved_tower_position := original_tower_position + Vector3(0.35, 0, 0.25)
+	assert(game.move_lane_tower(enemy_tower_id, moved_tower_position),
+		"Moving a data-driven lane tower failed")
+	assert(enemy_tower.global_position.is_equal_approx(moved_tower_position),
+		"Lane tower actor did not move to the requested position")
+	assert(is_equal_approx(enemy_platform.position.x, moved_tower_position.x) \
+		and is_equal_approx(enemy_platform.position.z, moved_tower_position.z),
+		"Tower platform did not move together with its tower")
+	assert(game.move_lane_tower(enemy_tower_id, original_tower_position),
+		"Lane tower could not be restored after the modularity check")
+
+	game.call("_hatch_dragon")
+	await process_frame
+	assert(game.dragon_hatched, "Dragon hatch state was not activated")
+	assert(not is_instance_valid(dragon_egg), "Dragon egg was not removed after hatching")
+	var dragon := game.find_children("*", "ArenaActor", true, false).filter(
+		func(actor: ArenaActor) -> bool: return actor.actor_kind == &"dragon")
+	assert(dragon.size() == 1, "Exactly one dragon must spawn after hatching")
+	assert(game.get_node_or_null(
+		"TravessiaMap/DynamicProps/DragonAccessBridges") != null,
+		"Central access bridges were not created during the hatch event")
+	await create_timer(1.5).timeout
+	var north_bridge := game.get_node(
+		"TravessiaMap/DynamicProps/DragonAccessBridges/NorthBridge") \
+		as ModularBridge3D
+	var south_bridge := game.get_node(
+		"TravessiaMap/DynamicProps/DragonAccessBridges/SouthBridge") \
+		as ModularBridge3D
+	assert(north_bridge != null and south_bridge != null,
+		"Dragon connections must instantiate the reusable 3D bridge scene")
+	assert(north_bridge.get_row_count() == 4 and south_bridge.get_row_count() == 4,
+		"Both dragon bridges must preserve the approved four-course masonry")
+	for bridge: ModularBridge3D in [north_bridge, south_bridge]:
+		assert(bridge.is_fully_revealed(),
+			"A modular 3D bridge did not finish assembling toward the dragon")
+		assert(bridge.get_node_or_null("DeckRows") != null,
+			"Modular bridge is missing its physical stone rows")
+		assert(bridge.get_node_or_null("BridgeCollision") != null,
+			"Modular bridge is missing its independent collision")
+		assert(is_equal_approx(bridge.bridge_width,
+			TravessiaMap.DRAGON_BRIDGE_WIDTH),
+			"Dragon bridges must keep the canonical full width")
+	assert(north_bridge.position.z < 0.0 \
+		and north_bridge.row_nodes[0].position.z > 0.0,
+		"North modular bridge must assemble south toward the dragon")
+	assert(is_equal_approx(north_bridge.start_width_scale,
+		TravessiaMap.NORTH_BRIDGE_START_SCALE)
+		and is_equal_approx(north_bridge.end_width_scale, 1.0),
+		"North bridge must widen subtly toward the closer island edge")
+	assert(is_equal_approx(south_bridge.start_width_scale, 1.0)
+		and is_equal_approx(south_bridge.end_width_scale, 1.0),
+		"Approved south bridge perspective must remain unchanged")
+	assert(south_bridge.position.z > 0.0 \
+		and south_bridge.row_nodes[0].position.z < 0.0,
+		"South modular bridge must assemble north toward the dragon")
+
 	brutus.global_position = Vector3(100.0, 0.0, 100.0)
+	await physics_frame
 	await physics_frame
 	assert(absf(brutus.global_position.x) <= TravessiaDefinition.PLAYABLE_HALF_EXTENTS.x \
 		and absf(brutus.global_position.z) <= TravessiaDefinition.PLAYABLE_HALF_EXTENTS.y,
@@ -90,7 +217,37 @@ func _run() -> void:
 	assert(blue_minion.objective != null, "Minion did not acquire a structure objective")
 	var objective_actor := blue_minion.objective as ArenaActor
 	assert(objective_actor != null and objective_actor.actor_kind == &"tower",
-		"Minion must focus the lane tower before the base")
+		"Minion must use the lane tower when no enemy unit is nearby")
+
+	# Unit targeting overrides the current tower objective without introducing
+	# lateral movement. Minions and heroes both have priority over structures.
+	var blue_position := blue_minion.global_position
+	var red_position := red_minion.global_position
+	red_minion.global_position = blue_position + Vector3(0.0, 0.0, -2.4)
+	blue_minion.objective = enemy_tower
+	blue_minion.call("_process_minion")
+	assert(blue_minion.objective == red_minion,
+		"Nearby enemy minion must have priority over the lane tower")
+
+	var enemy_hero: HeroBot
+	for hero_node in get_nodes_in_group("hero_bots"):
+		var hero := hero_node as HeroBot
+		if hero != null and hero.team == 1:
+			enemy_hero = hero
+			break
+	assert(enemy_hero != null, "Enemy hero required for minion priority test is missing")
+	var hero_position := enemy_hero.global_position
+	red_minion.global_position = blue_position + Vector3(0.0, 0.0, -8.0)
+	enemy_hero.global_position = blue_position + Vector3(0.0, 0.0, -2.2)
+	blue_minion.objective = enemy_tower
+	blue_minion.call("_process_minion")
+	assert(blue_minion.objective == enemy_hero,
+		"Nearby enemy hero must have priority over the lane tower")
+
+	enemy_hero.global_position = hero_position
+	red_minion.global_position = red_position
+	blue_minion.global_position = blue_position
+	blue_minion.objective = null
 
 	# Tower damage is represented by a travelling projectile instead of an
 	# invisible instant health subtraction.

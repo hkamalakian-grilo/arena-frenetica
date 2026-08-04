@@ -23,6 +23,8 @@ var match_over := false
 var team_bases: Dictionary = {}
 var hero_bots: Array[HeroBot] = []
 var arena_map: TravessiaMap
+var dragon_egg: ArenaActor
+var dragon_hatched := false
 var match_rules := TravessiaDefinition.match_rules()
 @export var follow_player_camera := false
 
@@ -62,6 +64,12 @@ func _process(delta: float) -> void:
 	_update_camera_shake(delta)
 	if not match_over:
 		match_time += delta
+		var hatch_at := float(match_rules.match_duration) \
+			- float(match_rules.dragon_hatch_remaining)
+		if not dragon_hatched and match_time >= hatch_at:
+			_hatch_dragon()
+		if match_time >= float(match_rules.match_duration):
+			_finish_by_time()
 		wave_timer -= delta
 		if wave_timer <= 0.0:
 			wave_timer = float(match_rules.wave_interval)
@@ -110,10 +118,11 @@ func _update_camera_shake(delta: float) -> void:
 
 func _build_match() -> void:
 	for structure in TravessiaDefinition.structures():
-		_spawn_structure(structure.kind, structure.team, structure.position,
-			structure.health, structure.color)
+		_spawn_structure(structure)
 	for objective in TravessiaDefinition.neutral_objectives():
-		_spawn_actor(objective, objective.position)
+		var neutral := _spawn_actor(objective, objective.position)
+		if objective.kind == &"dragon_egg":
+			dragon_egg = neutral
 	_spawn_hero_bots()
 	_refresh_base_protection()
 	wave_timer = 0.0
@@ -128,22 +137,37 @@ func _spawn_hero_bots() -> void:
 		hero_bots.append(bot)
 
 
-func _spawn_structure(kind: StringName, team: int, at_position: Vector3,
-		health: float, color: Color) -> ArenaActor:
+func _spawn_structure(data: Dictionary) -> ArenaActor:
+	var kind: StringName = data.kind
+	var team: int = data.team
 	var damage := 92.0 if kind == &"tower" else 0.0
 	var attack_range := 4.5 if kind == &"tower" else 0.0
 	var actor := _spawn_actor({
 		"kind": kind,
 		"team": team,
-		"health": health,
+		"health": data.health,
 		"attack_damage": damage,
 		"attack_range": attack_range,
 		"attack_interval": 1.20,
-		"color": color,
-	}, at_position)
+		"color": data.color,
+	}, data.position)
+	actor.name = String(data.id).to_pascal_case()
+	actor.set_meta("structure_id", data.id)
 	if kind == &"base":
 		team_bases[team] = actor
 	return actor
+
+
+func move_lane_tower(structure_id: StringName, at_position: Vector3) -> bool:
+	for node in get_tree().get_nodes_in_group("arena_actors"):
+		var actor := node as ArenaActor
+		if actor == null or actor.actor_kind != &"tower":
+			continue
+		if actor.get_meta("structure_id", &"") != structure_id:
+			continue
+		actor.global_position = Vector3(at_position.x, 0.0, at_position.z)
+		return arena_map.move_tower_platform(structure_id, at_position)
+	return false
 
 
 func _spawn_actor(data: Dictionary, at_position: Vector3) -> ArenaActor:
@@ -166,6 +190,44 @@ func _spawn_wave() -> void:
 func _spawn_minion(team: int, lane_x: float) -> void:
 	var data := TravessiaDefinition.minion(team, lane_x)
 	_spawn_actor(data, data.position)
+
+
+func _hatch_dragon() -> void:
+	if dragon_hatched or match_over:
+		return
+	dragon_hatched = true
+	if is_instance_valid(dragon_egg):
+		dragon_egg.queue_free()
+	var dragon_data := TravessiaDefinition.dragon_definition()
+	_spawn_actor(dragon_data, dragon_data.position)
+	arena_map.open_dragon_access(1.35)
+	status_label.text = "O OVO CHOCOU — DRAGAO NO CENTRO!"
+	status_label.modulate = Color("dca3ff")
+	_get_tree_timer_clear_status()
+
+
+func _finish_by_time() -> void:
+	if match_over:
+		return
+	match_over = true
+	var allied_health := _base_health(0)
+	var enemy_health := _base_health(1)
+	if enemy_health < allied_health:
+		status_label.text = "VITORIA POR TEMPO!"
+		status_label.modulate = Color("ffd45a")
+	elif allied_health < enemy_health:
+		status_label.text = "DERROTA POR TEMPO"
+		status_label.modulate = Color("ff6477")
+	else:
+		status_label.text = "EMPATE"
+		status_label.modulate = Color.WHITE
+
+
+func _base_health(team: int) -> float:
+	var reference = team_bases.get(team)
+	if is_instance_valid(reference):
+		return (reference as ArenaActor).health
+	return 0.0
 
 
 func _damage_enemies(center: Vector3, radius: float, damage: float) -> void:
@@ -301,11 +363,14 @@ func _build_match_hud() -> void:
 func _update_match_label() -> void:
 	if match_label == null:
 		return
-	var minutes := floori(match_time / 60.0)
-	var seconds := floori(match_time) % 60
+	var remaining := maxf(0.0, float(match_rules.match_duration) - match_time)
+	var total_seconds := ceili(remaining)
+	var minutes := total_seconds / 60
+	var seconds := total_seconds % 60
 	var enemy_health := 0
 	var enemy_base_reference = team_bases.get(1)
 	if is_instance_valid(enemy_base_reference):
 		var enemy_base := enemy_base_reference as ArenaActor
 		enemy_health = roundi(enemy_base.health)
-	match_label.text = "%02d:%02d   |   NUCLEO %d" % [minutes, seconds, enemy_health]
+	match_label.text = "%02d:%02d  |  %d  |  %s" % [minutes, seconds, enemy_health,
+		"DRAGAO" if dragon_hatched else "OVO"]

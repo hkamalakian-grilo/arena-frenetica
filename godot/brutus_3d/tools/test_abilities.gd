@@ -22,6 +22,9 @@ func _run() -> void:
 	for actor in get_nodes_in_group("arena_actors"):
 		actor.queue_free()
 	await process_frame
+	# Locomotion and lunges are tested on a canonical lane now that decorative
+	# jungle and water have physical movement restrictions.
+	brutus.global_position = Vector3(TravessiaDefinition.LANE_X[0], 0.0, 6.0)
 
 	brutus.set_virtual_input(Vector2(0, -0.45))
 	for _frame in range(24):

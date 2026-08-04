@@ -20,7 +20,7 @@ final é este projeto Godot e não precisa reproduzir as limitações visuais do
 - R — Escudo Bumerangue: giro de tronco, escudo destacável, voo, impacto e retorno; cooldown de 35 s.
 - Câmera MOBA ortográfica inclinada em 55°.
 - Controles por WASD, setas e analógico virtual.
-- Arena provisória em retrato, inspirada na Travessia.
+- Travessia em retrato com terreno, plataformas de torre e elementos dinâmicos em camadas modulares.
 - Renderizador `gl_compatibility`, adequado ao primeiro alvo mobile/web.
 
 ## Como executar
@@ -43,7 +43,11 @@ godot --path godot/brutus_3d
 - `tools/test_abilities.gd`: executa automaticamente Investida e Escudo Bumerangue e valida seus estados.
 - `scripts/data/travessia_definition.gd`: fonte canônica das posições e regras do mapa.
 - `scripts/travessia_map.gd`: apresentação jogável alinhada à arte aprovada da Travessia.
-- `assets/maps/travessia_clean_v1.png`: terreno limpo derivado da imagem conceitual aprovada.
+- `assets/maps/travessia_clean_v1.png`: referência artística original preservada.
+- `assets/maps/travessia_terrain_v3.png`: terreno modular usado pela partida,
+  incluindo o corredor lateral liberado no acampamento superior esquerdo.
+- `assets/maps/tower_platform_v1.png`: plataforma independente das torres de lane.
+- `docs/MODULAR_MAP_ARCHITECTURE.md`: regras para editar e ampliar o mapa sem repintá-lo.
 - `PRODUCTION_ROADMAP.md`: ordem de construção até a alpha jogável.
 
 O modelo não incorpora malhas, texturas ou animações de terceiros. A geometria, os materiais, o rig e os clips foram produzidos especificamente para este projeto a partir da identidade visual estabelecida para o Brutus.

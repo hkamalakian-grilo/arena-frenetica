@@ -12,11 +12,185 @@ const MAP_SIZE := Vector2(18.02, 34.0)
 const PLAYABLE_HALF_EXTENTS := Vector2(8.30, 16.25)
 const LANE_X := [-5.35, 5.35]
 
+## Physical movement mask. Rectangles deliberately overlap at junctions so a
+## capsule can slide naturally from a base into a lane or central approach.
+## Decorative grass, jungle, river and the exterior are not walkable.
+const WALKABLE_RECTS := [
+	{"name": &"left_north_road", "center": Vector2(-5.35, -7.85),
+		"half_extents": Vector2(1.35, 6.85)},
+	{"name": &"left_bridge", "center": Vector2(-5.35, 0.0),
+		"half_extents": Vector2(0.82, 1.85)},
+	{"name": &"left_south_road", "center": Vector2(-5.35, 7.85),
+		"half_extents": Vector2(1.35, 6.85)},
+	{"name": &"left_north_jungle_side", "center": Vector2(-3.90, -7.50),
+		"half_extents": Vector2(0.93, 2.75)},
+	{"name": &"right_north_road", "center": Vector2(5.35, -7.85),
+		"half_extents": Vector2(1.35, 6.85)},
+	{"name": &"right_bridge", "center": Vector2(5.35, 0.0),
+		"half_extents": Vector2(0.82, 1.85)},
+	{"name": &"right_south_road", "center": Vector2(5.35, 7.85),
+		"half_extents": Vector2(1.35, 6.85)},
+	{"name": &"north_center_path", "center": Vector2(0.0, -7.10),
+		"half_extents": Vector2(1.55, 3.80)},
+	{"name": &"south_center_path", "center": Vector2(0.0, 7.10),
+		"half_extents": Vector2(1.55, 3.80)},
+]
+
+## The painted base walls are curved. Ellipses prevent the rectangular corner
+## leaks that allowed actors to stand behind the north/south perimeter walls.
+const WALKABLE_ELLIPSES := [
+	{"name": &"red_base", "center": Vector2(0.0, -12.70),
+		"radii": Vector2(7.65, 2.70)},
+	{"name": &"blue_base", "center": Vector2(0.0, 12.70),
+		"radii": Vector2(7.65, 2.70)},
+]
+
+const DRAGON_ACCESS_RECTS := [
+	{"name": &"north_dragon_bridge", "center": Vector2(0.0, -2.80),
+		"half_extents": Vector2(0.88, 1.80)},
+	{"name": &"south_dragon_bridge", "center": Vector2(0.0, 2.80),
+		"half_extents": Vector2(0.88, 1.80)},
+]
+const DRAGON_ISLAND_RADIUS := 1.85
+
+
+static func is_walkable(point: Vector2, dragon_access_open := false,
+		body_radius := 0.42) -> bool:
+	for zone in WALKABLE_RECTS:
+		if _point_in_walkable_rect(point, zone, body_radius):
+			return true
+	for zone in WALKABLE_ELLIPSES:
+		if _point_in_walkable_ellipse(point, zone, body_radius):
+			return true
+	if not dragon_access_open:
+		return false
+	for zone in DRAGON_ACCESS_RECTS:
+		if _point_in_walkable_rect(point, zone, body_radius):
+			return true
+	return point.length() <= maxf(0.0, DRAGON_ISLAND_RADIUS - body_radius)
+
+
+static func constrain_walkable_motion(previous: Vector3, desired: Vector3,
+		dragon_access_open := false, body_radius := 0.42) -> Vector3:
+	var previous_point := Vector2(previous.x, previous.z)
+	var desired_point := Vector2(desired.x, desired.z)
+	if is_walkable(desired_point, dragon_access_open, body_radius):
+		return Vector3(desired_point.x, desired.y, desired_point.y)
+	if not is_walkable(previous_point, dragon_access_open, body_radius):
+		var recovered := nearest_walkable_point(desired_point,
+			dragon_access_open, body_radius)
+		return Vector3(recovered.x, desired.y, recovered.y)
+
+	# Resolve each axis independently first. This produces the familiar MOBA
+	# slide along river banks, jungle edges and arena walls.
+	var slide_candidates: Array[Vector2] = []
+	var x_motion := Vector2(desired_point.x, previous_point.y)
+	if is_walkable(x_motion, dragon_access_open, body_radius):
+		slide_candidates.append(x_motion)
+	var z_motion := Vector2(previous_point.x, desired_point.y)
+	if is_walkable(z_motion, dragon_access_open, body_radius):
+		slide_candidates.append(z_motion)
+	if not slide_candidates.is_empty():
+		var best_slide := slide_candidates[0]
+		for candidate in slide_candidates:
+			if candidate.distance_squared_to(desired_point) \
+					< best_slide.distance_squared_to(desired_point):
+				best_slide = candidate
+		return Vector3(best_slide.x, desired.y, best_slide.y)
+
+	# Dashes can cross a boundary within one physics tick. Binary search retains
+	# the last valid point instead of snapping all the way back to the start.
+	var valid_ratio := 0.0
+	var blocked_ratio := 1.0
+	for _iteration in range(12):
+		var middle := (valid_ratio + blocked_ratio) * 0.5
+		var candidate := previous_point.lerp(desired_point, middle)
+		if is_walkable(candidate, dragon_access_open, body_radius):
+			valid_ratio = middle
+		else:
+			blocked_ratio = middle
+	var boundary_point := previous_point.lerp(desired_point, valid_ratio)
+	return Vector3(boundary_point.x, desired.y, boundary_point.y)
+
+
+static func nearest_walkable_point(point: Vector2,
+		dragon_access_open := false, body_radius := 0.42) -> Vector2:
+	var best_point := Vector2.ZERO
+	var best_distance := INF
+	var zones: Array = WALKABLE_RECTS.duplicate()
+	if dragon_access_open:
+		zones.append_array(DRAGON_ACCESS_RECTS)
+	for zone in zones:
+		var center: Vector2 = zone.center
+		var half_extents: Vector2 = zone.half_extents \
+			- Vector2.ONE * body_radius
+		half_extents.x = maxf(0.0, half_extents.x)
+		half_extents.y = maxf(0.0, half_extents.y)
+		var candidate := Vector2(
+			clampf(point.x, center.x - half_extents.x,
+				center.x + half_extents.x),
+			clampf(point.y, center.y - half_extents.y,
+				center.y + half_extents.y))
+		var distance := candidate.distance_squared_to(point)
+		if distance < best_distance:
+			best_distance = distance
+			best_point = candidate
+	for zone in WALKABLE_ELLIPSES:
+		var center: Vector2 = zone.center
+		var radii: Vector2 = zone.radii - Vector2.ONE * body_radius
+		radii.x = maxf(0.001, radii.x)
+		radii.y = maxf(0.001, radii.y)
+		var local_point := point - center
+		var normalized_point := Vector2(local_point.x / radii.x,
+			local_point.y / radii.y)
+		var candidate := point
+		if normalized_point.length_squared() > 1.0:
+			var edge_direction := normalized_point.normalized()
+			candidate = center + Vector2(edge_direction.x * radii.x,
+				edge_direction.y * radii.y)
+		var distance := candidate.distance_squared_to(point)
+		if distance < best_distance:
+			best_distance = distance
+			best_point = candidate
+	if dragon_access_open:
+		var island_radius := maxf(0.0, DRAGON_ISLAND_RADIUS - body_radius)
+		var island_point := point
+		if point.length() > island_radius:
+			island_point = point.normalized() * island_radius
+		var island_distance := island_point.distance_squared_to(point)
+		if island_distance < best_distance:
+			best_point = island_point
+	return best_point
+
+
+static func _point_in_walkable_rect(point: Vector2, zone: Dictionary,
+		body_radius: float) -> bool:
+	var center: Vector2 = zone.center
+	var half_extents: Vector2 = zone.half_extents - Vector2.ONE * body_radius
+	if half_extents.x < 0.0 or half_extents.y < 0.0:
+		return false
+	return absf(point.x - center.x) <= half_extents.x \
+		and absf(point.y - center.y) <= half_extents.y
+
+
+static func _point_in_walkable_ellipse(point: Vector2, zone: Dictionary,
+		body_radius: float) -> bool:
+	var center: Vector2 = zone.center
+	var radii: Vector2 = zone.radii - Vector2.ONE * body_radius
+	if radii.x <= 0.0 or radii.y <= 0.0:
+		return false
+	var local_point := point - center
+	var normalized_point := Vector2(local_point.x / radii.x,
+		local_point.y / radii.y)
+	return normalized_point.length_squared() <= 1.0
+
 
 static func match_rules() -> Dictionary:
 	return {
 		# Canonical Alpha pace: every time-based system runs at half speed.
 		"game_speed": 0.50,
+		"match_duration": 180.0,
+		"dragon_hatch_remaining": 60.0,
 		"wave_interval": 8.0,
 		"max_actors": 42,
 		"respawn_time": 3.0,
@@ -68,6 +242,7 @@ static func structures() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for marker in main_tower_markers():
 		result.append({
+			"id": marker.id,
 			# "base" remains the internal gameplay identifier. In the game and
 			# documentation this objective is called the main tower/core.
 			"kind": &"base",
@@ -78,6 +253,7 @@ static func structures() -> Array[Dictionary]:
 		})
 	for marker in tower_markers():
 		result.append({
+			"id": marker.id,
 			"kind": &"tower",
 			"team": marker.team,
 			"position": marker.position,
@@ -91,9 +267,9 @@ static func main_tower_markers() -> Array[Dictionary]:
 	# Centers of the two large circular platforms. They are measured separately
 	# because the approved painted map is intentionally not perfectly symmetric.
 	return [
-		{"team": 1, "map_pixel": Vector2(455, 171),
+		{"id": &"red_core", "team": 1, "map_pixel": Vector2(455, 171),
 			"position": Vector3(-0.0296, 0, -13.6257)},
-		{"team": 0, "map_pixel": Vector2(455, 1502),
+		{"id": &"blue_core", "team": 0, "map_pixel": Vector2(455, 1502),
 			"position": Vector3(-0.0296, 0, 12.6390)},
 	]
 
@@ -103,19 +279,29 @@ static func tower_markers() -> Array[Dictionary]:
 	# converted to the 18.02x34 Godot plane. The generated art is intentionally
 	# not forced into mathematical symmetry.
 	return [
-		{"team": 1, "map_pixel": Vector2(200, 238),
+		{"id": &"red_left_tower", "team": 1, "map_pixel": Vector2(200, 238),
 			"position": Vector3(-5.0626, 0, -12.3035)},
-		{"team": 1, "map_pixel": Vector2(705, 238),
+		{"id": &"red_right_tower", "team": 1, "map_pixel": Vector2(705, 238),
 			"position": Vector3(4.9047, 0, -12.3035)},
-		{"team": 0, "map_pixel": Vector2(200, 1463),
+		{"id": &"blue_left_tower", "team": 0, "map_pixel": Vector2(200, 1463),
 			"position": Vector3(-5.0626, 0, 11.8694)},
-		{"team": 0, "map_pixel": Vector2(705, 1463),
+		{"id": &"blue_right_tower", "team": 0, "map_pixel": Vector2(705, 1463),
 			"position": Vector3(4.9047, 0, 11.8694)},
 	]
 
 
 static func neutral_objectives() -> Array[Dictionary]:
 	return [{
+		"kind": &"dragon_egg",
+		"team": 2,
+		"position": Vector3.ZERO,
+		"health": 1.0,
+		"color": Color("8e63bb"),
+	}]
+
+
+static func dragon_definition() -> Dictionary:
+	return {
 		"kind": &"dragon",
 		"team": 2,
 		"position": Vector3.ZERO,
@@ -124,7 +310,7 @@ static func neutral_objectives() -> Array[Dictionary]:
 		"attack_range": 3.4,
 		"attack_interval": 1.15,
 		"color": Color("9c55cc"),
-	}]
+	}
 
 
 static func hero_bots() -> Array[Dictionary]:

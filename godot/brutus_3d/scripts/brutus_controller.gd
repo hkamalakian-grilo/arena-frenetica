@@ -16,6 +16,7 @@ signal defeated
 @export var q_cooldown := 7.0
 @export var q_dash_speed := 10.5
 @export var r_cooldown := 35.0
+@export var movement_collision_radius := 0.34
 
 const BRUTUS_SCENE := preload("res://assets/brutus/brutus.glb")
 const SHIELD_SCENE := preload("res://assets/brutus/brutus_shield.glb")
@@ -49,15 +50,20 @@ var shield_projectile_start := Vector3.ZERO
 var shield_projectile_target := Vector3.ZERO
 var shield_projectile_reached_end := false
 var shield_trail_timer := 0.0
+var movement_map: TravessiaMap
 
 
 func _ready() -> void:
 	health = max_health
 	add_to_group("damageable")
+	# Todos os atores moveis ocupam a camada 2, mas consultam apenas a camada 1
+	# do mapa. Assim herois e minions se atravessam sem empurrar ou bloquear.
+	collision_layer = 2
+	collision_mask = 1
 	_ensure_input_actions()
 	visual_root = Node3D.new()
 	visual_root.name = "VisualRoot"
-	visual_root.scale = Vector3.ONE * 0.72
+	visual_root.scale = Vector3.ONE * 0.56
 	add_child(visual_root)
 	var model := BRUTUS_SCENE.instantiate()
 	model.name = "BrutusModel"
@@ -159,8 +165,9 @@ func _physics_process(delta: float) -> void:
 			locomotion_animation = &""
 
 	_apply_gravity(delta)
+	var previous_position := global_position
 	move_and_slide()
-	_clamp_to_playable_area()
+	_constrain_to_walkable_area(previous_position)
 	_update_speed_ratio()
 	_update_locomotion_animation()
 
@@ -226,15 +233,23 @@ func _movement_vector() -> Vector2:
 	return input_vector
 
 
-func _clamp_to_playable_area() -> void:
-	# Collision walls remain useful for sliding, while this hard guard also stops
-	# authored lunges and dash motion from ever crossing the painted arena.
-	global_position.x = clampf(global_position.x,
-		-TravessiaDefinition.PLAYABLE_HALF_EXTENTS.x,
-		TravessiaDefinition.PLAYABLE_HALF_EXTENTS.x)
-	global_position.z = clampf(global_position.z,
-		-TravessiaDefinition.PLAYABLE_HALF_EXTENTS.y,
-		TravessiaDefinition.PLAYABLE_HALF_EXTENTS.y)
+func _constrain_to_walkable_area(previous_position: Vector3) -> void:
+	var desired_position := global_position
+	var constrained := TravessiaDefinition.constrain_walkable_motion(
+		previous_position, desired_position, _dragon_access_is_open(),
+		movement_collision_radius)
+	if not is_equal_approx(constrained.x, desired_position.x):
+		velocity.x = 0.0
+	if not is_equal_approx(constrained.z, desired_position.z):
+		velocity.z = 0.0
+	global_position = constrained
+
+
+func _dragon_access_is_open() -> bool:
+	if not is_instance_valid(movement_map):
+		movement_map = get_tree().get_first_node_in_group(
+			"travessia_map") as TravessiaMap
+	return movement_map != null and movement_map.is_dragon_access_open()
 
 
 func _is_attack_state() -> bool:

@@ -1,12 +1,48 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/brutus_controller.gd" id="2_brutus"]
 [ext_resource type="Script" path="res://scripts/virtual_joystick.gd" id="3_joystick"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_brutus"]
-radius = 0.42
-height = 1.72
+radius = 0.34
+height = 1.42
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_action_normal"]
+bg_color = Color(0.02, 0.04, 0.025, 0.22)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(1, 0.78, 0.27, 0.72)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_action_hover"]
+bg_color = Color(0.07, 0.08, 0.035, 0.34)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(1, 0.86, 0.42, 0.9)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_action_pressed"]
+bg_color = Color(0.22, 0.13, 0.035, 0.5)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(1, 0.92, 0.58, 1)
+corner_radius_top_left = 64
+corner_radius_top_right = 64
+corner_radius_bottom_right = 64
+corner_radius_bottom_left = 64
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -15,7 +51,7 @@ script = ExtResource("1_main")
 script = ExtResource("2_brutus")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Brutus"]
-position = Vector3(0, 0.86, 0)
+position = Vector3(0, 0.71, 0)
 shape = SubResource("CapsuleShape_brutus")
 
 [node name="CameraRig" type="Node3D" parent="."]
@@ -24,7 +60,7 @@ shape = SubResource("CapsuleShape_brutus")
 position = Vector3(0, 36, 9.65)
 rotation_degrees = Vector3(-75, 0, 0)
 projection = 1
-size = 35.5
+size = 37.0
 far = 200.0
 current = true
 
@@ -104,6 +140,9 @@ offset_bottom = -48.0
 theme_override_colors/font_color = Color(1, 0.86, 0.45, 1)
 theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 24
+theme_override_styles/normal = SubResource("StyleBox_action_normal")
+theme_override_styles/hover = SubResource("StyleBox_action_hover")
+theme_override_styles/pressed = SubResource("StyleBox_action_pressed")
 text = "ATAQUE"
 
 [node name="QButton" type="Button" parent="HUD"]
@@ -112,13 +151,16 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -330.0
+offset_left = -260.0
 offset_top = -176.0
-offset_right = -204.0
+offset_right = -134.0
 offset_bottom = -50.0
 theme_override_colors/font_color = Color(1, 0.72, 0.24, 1)
 theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBox_action_normal")
+theme_override_styles/hover = SubResource("StyleBox_action_hover")
+theme_override_styles/pressed = SubResource("StyleBox_action_pressed")
 text = "Q  INVESTIDA"
 
 [node name="RButton" type="Button" parent="HUD"]
@@ -134,6 +176,9 @@ offset_bottom = -212.0
 theme_override_colors/font_color = Color(0.85, 0.58, 1, 1)
 theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBox_action_normal")
+theme_override_styles/hover = SubResource("StyleBox_action_hover")
+theme_override_styles/pressed = SubResource("StyleBox_action_pressed")
 text = "R  ARREMESSO"
 
 [node name="Prototype" type="Label" parent="HUD"]

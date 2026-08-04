@@ -5,32 +5,105 @@ extends Node3D
 ## Gameplay positions live in TravessiaDefinition, so this node can later be
 ## replaced by authored terrain, vegetation and props without rewriting rules.
 
-const MAP_ART := preload("res://assets/maps/travessia_clean_v1.png")
+const TERRAIN_ART := preload("res://assets/maps/travessia_terrain_v3.png")
+const TOWER_PLATFORM_ART := preload("res://assets/maps/tower_platform_v1.png")
+const MODULAR_BRIDGE_SCENE := preload(
+	"res://scenes/world/modular_bridge_3d.tscn")
+const DRAGON_BRIDGE_WIDTH := 2.06
+const DRAGON_BRIDGE_ISLAND_OVERLAP := 0.20
+const NORTH_BRIDGE_START_SCALE := 0.93
+const NORTH_GATE_EDGE_Z := -4.38
+const NORTH_ISLAND_ENTRY_Z := -2.67
+const SOUTH_GATE_EDGE_Z := 3.36
+const SOUTH_ISLAND_ENTRY_Z := 1.95
+const TOWER_PLATFORM_REGION := Rect2(136, 206, 1000, 820)
+const TOWER_PLATFORM_WIDTH := 1.92
+
+var dragon_access: Node3D
+var terrain_layer: Node3D
+var static_props: Node3D
+var dynamic_props: Node3D
+var tower_platforms: Dictionary = {}
 
 
 func build() -> void:
 	name = "TravessiaMap"
+	add_to_group("travessia_map")
+	_create_visual_layers()
 	_build_environment()
-	_add_map_art()
+	_add_terrain_art()
+	_add_tower_platforms()
 	_add_floor_collision()
 	_add_boundary_collisions()
 
 
-func _add_map_art() -> void:
+func _create_visual_layers() -> void:
+	terrain_layer = Node3D.new()
+	terrain_layer.name = "TerrainLayer"
+	add_child(terrain_layer)
+	static_props = Node3D.new()
+	static_props.name = "StaticProps"
+	add_child(static_props)
+	dynamic_props = Node3D.new()
+	dynamic_props.name = "DynamicProps"
+	add_child(dynamic_props)
+
+
+func _add_terrain_art() -> void:
 	var map_art := MeshInstance3D.new()
-	map_art.name = "MapArt"
+	map_art.name = "TerrainArt"
 	var mesh := PlaneMesh.new()
 	mesh.size = TravessiaDefinition.MAP_SIZE
 	map_art.mesh = mesh
 	var material := StandardMaterial3D.new()
-	material.albedo_texture = MAP_ART
+	material.albedo_texture = TERRAIN_ART
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	map_art.material_override = material
 	map_art.position.y = 0.002
 	map_art.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	add_child(map_art)
+	terrain_layer.add_child(map_art)
+
+
+func _add_tower_platforms() -> void:
+	var platforms_root := Node3D.new()
+	platforms_root.name = "TowerPlatforms"
+	static_props.add_child(platforms_root)
+	for marker in TravessiaDefinition.tower_markers():
+		var structure_id: StringName = marker.id
+		var anchor := Node3D.new()
+		anchor.name = String(structure_id).to_pascal_case()
+		anchor.position = marker.position + Vector3(0, 0.012, 0)
+		anchor.set_meta("structure_id", structure_id)
+		platforms_root.add_child(anchor)
+		var platform_art := Sprite3D.new()
+		platform_art.name = "PlatformArt"
+		var platform_texture := AtlasTexture.new()
+		platform_texture.atlas = TOWER_PLATFORM_ART
+		platform_texture.region = TOWER_PLATFORM_REGION
+		platform_art.texture = platform_texture
+		platform_art.pixel_size = TOWER_PLATFORM_WIDTH / TOWER_PLATFORM_REGION.size.x
+		platform_art.rotation.x = -PI * 0.5
+		platform_art.shaded = false
+		platform_art.double_sided = true
+		platform_art.modulate = Color(0.78, 0.79, 0.70, 1.0)
+		platform_art.texture_filter = \
+			BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		anchor.add_child(platform_art)
+		tower_platforms[structure_id] = anchor
+
+
+func get_tower_platform(structure_id: StringName) -> Node3D:
+	return tower_platforms.get(structure_id) as Node3D
+
+
+func move_tower_platform(structure_id: StringName, at_position: Vector3) -> bool:
+	var platform := get_tower_platform(structure_id)
+	if platform == null:
+		return false
+	platform.position = Vector3(at_position.x, 0.012, at_position.z)
+	return true
 
 
 func _build_environment() -> void:
@@ -121,3 +194,37 @@ func _add_boundary(parent: Node3D, node_name: String, at_position: Vector3,
 	collision.shape = shape
 	body.add_child(collision)
 	parent.add_child(body)
+
+
+func open_dragon_access(duration: float = 1.2) -> void:
+	if dragon_access != null:
+		return
+	dragon_access = Node3D.new()
+	dragon_access.name = "DragonAccessBridges"
+	dynamic_props.add_child(dragon_access)
+	_build_dragon_bridge("NorthBridge", NORTH_GATE_EDGE_Z,
+		NORTH_ISLAND_ENTRY_Z, duration)
+	_build_dragon_bridge("SouthBridge", SOUTH_GATE_EDGE_Z,
+		SOUTH_ISLAND_ENTRY_Z, duration)
+
+
+func is_dragon_access_open() -> bool:
+	return dragon_access != null
+
+
+func _build_dragon_bridge(node_name: String, gate_edge_z: float,
+		island_entry_z: float, duration: float) -> Node3D:
+	var bridge := MODULAR_BRIDGE_SCENE.instantiate() as ModularBridge3D
+	bridge.name = node_name
+	bridge.position = Vector3(0, 0.004, gate_edge_z)
+	dragon_access.add_child(bridge)
+	var growth_direction := signf(island_entry_z - gate_edge_z)
+	var blended_island_entry := island_entry_z \
+		+ growth_direction * DRAGON_BRIDGE_ISLAND_OVERLAP
+	var bridge_length := absf(blended_island_entry - gate_edge_z)
+	var start_scale := NORTH_BRIDGE_START_SCALE \
+		if node_name == "NorthBridge" else 1.0
+	bridge.configure(bridge_length, growth_direction, DRAGON_BRIDGE_WIDTH,
+		start_scale, 1.0)
+	bridge.reveal(duration)
+	return bridge

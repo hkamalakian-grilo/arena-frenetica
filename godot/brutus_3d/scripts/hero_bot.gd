@@ -23,6 +23,7 @@ var visual_model: StylizedActor3D
 var nameplate: Label3D
 var collision: CollisionShape3D
 var facing_direction := Vector3(0, 0, -1)
+var movement_map: TravessiaMap
 
 
 func configure(data: Dictionary) -> void:
@@ -91,7 +92,9 @@ func _physics_process(delta: float) -> void:
 		var direction := offset.normalized()
 		facing_direction = direction
 		velocity = direction * move_speed
+		var previous_position := global_position
 		move_and_slide()
+		_constrain_to_walkable_area(previous_position)
 		visual_model.update_motion(delta, facing_direction, 1.0)
 	else:
 		velocity = Vector3.ZERO
@@ -173,6 +176,24 @@ func _revive() -> void:
 	nameplate.visible = false
 	collision.set_deferred("disabled", false)
 	_update_nameplate()
+
+
+func _constrain_to_walkable_area(previous_position: Vector3) -> void:
+	var desired_position := global_position
+	var constrained := TravessiaDefinition.constrain_walkable_motion(
+		previous_position, desired_position, _dragon_access_is_open(), 0.42)
+	if not is_equal_approx(constrained.x, desired_position.x):
+		velocity.x = 0.0
+	if not is_equal_approx(constrained.z, desired_position.z):
+		velocity.z = 0.0
+	global_position = constrained
+
+
+func _dragon_access_is_open() -> bool:
+	if not is_instance_valid(movement_map):
+		movement_map = get_tree().get_first_node_in_group(
+			"travessia_map") as TravessiaMap
+	return movement_map != null and movement_map.is_dragon_access_open()
 
 
 func _build_visual() -> void:
