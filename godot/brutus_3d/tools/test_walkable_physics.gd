@@ -146,8 +146,11 @@ func _run() -> void:
 
 	game.call("_hatch_dragon")
 	await physics_frame
+	assert(not arena_map.is_dragon_access_open(),
+		"Dragon access opened before the bridge construction finished")
+	await create_timer(3.0, true, false, true).timeout
 	assert(arena_map.is_dragon_access_open(),
-		"Dragon access did not become physically walkable after hatching")
+		"Dragon access did not become walkable after bridge construction")
 	assert(TravessiaDefinition.is_walkable(Vector2(0.0, -3.0), true),
 		"The northern dragon bridge must be walkable after hatching")
 	assert(TravessiaDefinition.is_walkable(Vector2.ZERO, true),

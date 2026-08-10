@@ -215,6 +215,8 @@ func _run() -> void:
 	assert(game.get_node_or_null(
 		"TravessiaMap/DynamicProps/DragonAccessBridges") != null,
 		"Central access bridges were not created during the hatch event")
+	assert(not game.arena_map.is_dragon_access_open(),
+		"Dragon access must remain blocked while the bridges are assembling")
 	await create_timer(1.5).timeout
 	var north_bridge := game.get_node(
 		"TravessiaMap/DynamicProps/DragonAccessBridges/NorthBridge") \
@@ -236,6 +238,10 @@ func _run() -> void:
 		assert(is_equal_approx(bridge.bridge_width,
 			TravessiaMap.DRAGON_BRIDGE_WIDTH),
 			"Dragon bridges must keep the canonical full width")
+		assert(bridge.is_collision_enabled(),
+			"Bridge collision must activate after the final masonry row")
+	assert(game.arena_map.is_dragon_access_open(),
+		"Dragon access must open after both bridges finish assembling")
 	assert(north_bridge.position.z < 0.0 \
 		and north_bridge.row_nodes[0].position.z > 0.0,
 		"North modular bridge must assemble south toward the dragon")

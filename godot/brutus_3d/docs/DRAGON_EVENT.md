@@ -16,9 +16,11 @@
    `assets/dragon/dragon_egg_purple_v1.png`.
 2. `01:00`: anúncio `O OVO CHOCOU — DRAGAO NO CENTRO!`.
 3. Duas instâncias de `ModularBridge3D` são montadas da estrutura existente até
-   a ilha durante 1,35 segundo. Cada fileira física sobe da água em sequência.
-   As pedras possuem geometria, juntas, bordas, espessura e colisão próprias;
-   apenas suas faces reutilizam amostras da arte aprovada das pontes laterais.
+   a ilha durante 1,35 segundo de jogo. Quatro cursos completos de alvenaria
+   sobem da água em sequência, usando a escala e as pedras da ponte lateral
+   aprovada. O tabuleiro possui espessura 3D discreta e encaixa sob as muralhas.
+   A colisão e a máscara caminhável permanecem bloqueadas até as duas pontes
+   terminarem a construção.
 4. O dragão nasce no ponto central e passa a ser um objetivo neutro atacável.
 
 ## Fonte dos parâmetros

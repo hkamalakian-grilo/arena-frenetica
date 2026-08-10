@@ -56,6 +56,7 @@ var terrain_layer: Node3D
 var static_props: Node3D
 var dynamic_props: Node3D
 var tower_platforms: Dictionary = {}
+var dragon_bridges_ready := 0
 
 
 func build() -> void:
@@ -352,6 +353,7 @@ func open_dragon_access(duration: float = 1.2) -> void:
 	if dragon_access != null:
 		return
 	dragon_access = Node3D.new()
+	dragon_bridges_ready = 0
 	dragon_access.name = "DragonAccessBridges"
 	dynamic_props.add_child(dragon_access)
 	_build_dragon_bridge("NorthBridge", NORTH_GATE_EDGE_Z,
@@ -361,7 +363,7 @@ func open_dragon_access(duration: float = 1.2) -> void:
 
 
 func is_dragon_access_open() -> bool:
-	return dragon_access != null
+	return dragon_access != null and dragon_bridges_ready >= 2
 
 
 func _build_dragon_bridge(node_name: String, gate_edge_z: float,
@@ -378,5 +380,10 @@ func _build_dragon_bridge(node_name: String, gate_edge_z: float,
 		if node_name == "NorthBridge" else 1.0
 	bridge.configure(bridge_length, growth_direction, DRAGON_BRIDGE_WIDTH,
 		start_scale, 1.0)
+	bridge.reveal_completed.connect(_on_dragon_bridge_ready)
 	bridge.reveal(duration)
 	return bridge
+
+
+func _on_dragon_bridge_ready() -> void:
+	dragon_bridges_ready += 1
