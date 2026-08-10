@@ -12,7 +12,10 @@ const MIN_ROW_COUNT := 4
 const DECK_WIDTH_RATIO := 0.92
 const MIN_DECK_WIDTH := 1.82
 const DECK_THICKNESS := 0.08
-const REST_Y := 0.105
+# The authored river mesh gains a little height near both stone banks. Keeping
+# the deck above that interpolation prevents water pixels from cutting through
+# the masonry while collision remains on the canonical gameplay plane.
+const REST_Y := 0.165
 
 const MAP_ART := preload("res://assets/maps/travessia_terrain_v3.png")
 
