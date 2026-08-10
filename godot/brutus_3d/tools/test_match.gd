@@ -62,9 +62,9 @@ func _run() -> void:
 	var height_texture := terrain_material.get_shader_parameter("height_texture") \
 		as Texture2D
 	assert(terrain_texture.resource_path.ends_with(
-		"travessia_terrain_v4.png"),
+		"travessia_terrain_v6.png"),
 		"Travessia 2.5D must keep the approved terrain artwork")
-	assert(height_texture.resource_path.ends_with("travessia_depth_v2.png"),
+	assert(height_texture.resource_path.ends_with("travessia_depth_v1.png"),
 		"Travessia 2.5D must use the aligned authored height map")
 	var upper_left_camp := game.get_node(
 		"TravessiaMap/StaticProps/JungleModules/UpperLeftCamp") \
@@ -72,10 +72,39 @@ func _run() -> void:
 	assert(upper_left_camp != null,
 		"The first separated jungle camp module must exist")
 	var camp_material := upper_left_camp.material_override as ShaderMaterial
-	var camp_texture := camp_material.get_shader_parameter("camp_texture") \
+	var camp_texture := camp_material.get_shader_parameter("module_texture") \
 		as Texture2D
-	assert(camp_texture.resource_path.ends_with("upper_left_camp_v1.png"),
+	assert(camp_texture.resource_path.ends_with("upper_left_camp_full_v1.png"),
 		"The separated camp must use untouched pixels from the approved map")
+	var jungle_modules := game.get_node(
+		"TravessiaMap/StaticProps/JungleModules") as Node3D
+	assert(jungle_modules.get_child_count() == 4,
+		"All four jungle camps must be independent 2.5D modules")
+	for camp_name in ["UpperLeftCamp", "UpperRightCamp", "LowerLeftCamp",
+			"LowerRightCamp"]:
+		var camp_module := jungle_modules.get_node(camp_name) as MeshInstance3D
+		assert(camp_module != null and camp_module.get_meta("module_kind") \
+			== &"jungle_camp", "Every jungle camp must expose a stable module")
+	var map_art_modules := game.get_node(
+		"TravessiaMap/StaticProps/MapArtModules") as Node3D
+	assert(map_art_modules != null and map_art_modules.get_child_count() == 9,
+		"Travessia must expose all nine independent environment modules")
+	var expected_map_modules := {
+		"NorthBoundary": &"boundary",
+		"SouthBoundary": &"boundary",
+		"WestOuterForest": &"outer_forest",
+		"EastOuterForest": &"outer_forest",
+		"NorthRiverBank": &"river_bank",
+		"SouthRiverBank": &"river_bank",
+		"DragonIsland": &"dragon_island",
+		"LeftLaneBridge": &"lane_bridge",
+		"RightLaneBridge": &"lane_bridge",
+	}
+	for module_name in expected_map_modules:
+		var map_module := map_art_modules.get_node(module_name) as MeshInstance3D
+		assert(map_module != null and map_module.get_meta("module_kind") \
+			== expected_map_modules[module_name],
+			"Every environment section must expose a stable 2.5D module")
 	assert(game.get_node("TravessiaMap/StaticProps/TowerPlatforms").get_child_count() == 4,
 		"Every lane tower must have an independent movable platform")
 	assert(game.get_node("TravessiaMap/DynamicProps") is Node3D,

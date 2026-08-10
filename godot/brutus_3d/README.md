@@ -45,15 +45,21 @@ godot --path godot/brutus_3d
 - `scripts/data/travessia_definition.gd`: fonte canônica das posições e regras do mapa.
 - `scripts/travessia_map.gd`: apresentação jogável alinhada à arte aprovada da Travessia.
 - `assets/maps/travessia_clean_v1.png`: referência artística original preservada.
-- `assets/maps/travessia_terrain_v4.png`: chão canônico usado pela partida, já
-  sem os objetos do primeiro acampamento separado.
-- `assets/maps/travessia_depth_v2.png`: relevo 2.5D derivado pixel a pixel da
-  arte canônica; levanta florestas, muralhas, rochas e a ilha sem redesenhá-las.
-- `assets/maps/upper_left_camp_v1.png`: primeiro acampamento extraído da própria
-  arte e posicionado como módulo 2.5D independente.
+- `assets/maps/travessia_terrain_v6.png`: chão canônico compartilhado por todas
+  as peças modulares da Travessia.
+- `assets/maps/travessia_depth_v1.png`: relevo 2.5D global alinhado à arte;
+  levanta florestas, muralhas, rochas e a ilha sem redesenhá-las.
+- `assets/maps/*_full_v1.png`: treze camadas transparentes alinhadas à malha:
+  quatro jungles, limites, florestas, margens, ilha e duas pontes.
 - `tools/build_travessia_depth.gd`: reconstrói deterministicamente o mapa de altura.
 - `tools/build_upper_left_camp_module.gd`: recompõe chão limpo, recorte e relevo
   do primeiro acampamento sem alterar lanes ou ponte.
+- `tools/build_remaining_camp_modules.gd`: separa os outros três acampamentos e
+  atualiza o chão e o relevo compartilhados.
+- `tools/build_full_canvas_camp_modules.gd`: alinha os recortes de jungle aos
+  mesmos UVs e à mesma perspectiva da malha principal.
+- `tools/build_complete_map_modules.gd`: reconstrói os nove módulos ambientais
+  e o chão V6 de forma determinística.
 - `assets/maps/tower_platform_v1.png`: plataforma independente das torres de lane.
 - `docs/MODULAR_MAP_ARCHITECTURE.md`: regras para editar e ampliar o mapa sem repintá-lo.
 - `PRODUCTION_ROADMAP.md`: ordem de construção até a alpha jogável.

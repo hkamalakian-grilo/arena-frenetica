@@ -14,21 +14,29 @@ TravessiaMap
 ├── TerrainLayer
 │   └── TerrainArt
 ├── StaticProps
+│   ├── MapArtModules
+│   │   ├── NorthBoundary / SouthBoundary
+│   │   ├── WestOuterForest / EastOuterForest
+│   │   ├── NorthRiverBank / SouthRiverBank
+│   │   ├── DragonIsland
+│   │   └── LeftLaneBridge / RightLaneBridge
 │   ├── TowerPlatforms
 │   └── JungleModules
-│       └── UpperLeftCamp
+│       ├── UpperLeftCamp
+│       ├── UpperRightCamp
+│       ├── LowerLeftCamp
+│       └── LowerRightCamp
 ├── DynamicProps
 │   └── DragonAccessBridges (criado durante a partida)
 ├── FloorCollision
 └── ArenaBounds
 ```
 
-- `TerrainLayer`: usa `travessia_terrain_v4.png`, sem as quatro plataformas das
-  torres de lane. A textura permanece visualmente canônica, mas é aplicada a
-  uma malha subdividida e deslocada por `travessia_depth_v2.png`, produzindo
-  relevo 2.5D sem reinventar a arte.
-- `StaticProps`: contém objetos separados que permanecem durante a partida. As
-  plataformas das torres e o primeiro acampamento de jungle são montados aqui.
+- `TerrainLayer`: usa `travessia_terrain_v6.png` como chão compartilhado. A
+  textura permanece visualmente canônica e usa o mesmo relevo global das
+  camadas, evitando emendas entre as peças 2.5D.
+- `StaticProps`: contém os nove grupos ambientais, os quatro acampamentos e as
+  plataformas das torres como objetos independentes que permanecem na partida.
 - `DynamicProps`: contém objetos que surgem, desaparecem ou animam, como as
   pontes do dragão.
 - Colisões continuam independentes da imagem e das camadas visuais.
@@ -61,17 +69,25 @@ restaura a posição original.
 ## Assets
 
 - `travessia_clean_v1.png`: referência artística original preservada.
-- `travessia_terrain_v4.png`: chão de produção com o acampamento superior
-  esquerdo removido para receber o módulo independente.
-- `travessia_depth_v2.png`: mapa de altura do chão, sem duplicar o relevo do módulo.
-- `upper_left_camp_v1.png`: pixels originais do acampamento com máscara alfa.
-- `upper_left_camp_depth_v1.png`: relevo exclusivo do primeiro acampamento.
-- `upper_left_camp_ground_ai_v1.png`: referência de grama usada somente sob a
-  máscara do módulo; lanes, ponte e pixels externos não são consumidos.
+- `travessia_terrain_v6.png`: chão de produção sob os treze módulos visuais.
+- `travessia_depth_v1.png`: relevo global compartilhado, necessário para que
+  todos os recortes tenham a mesma perspectiva e não criem costuras.
+- `*_full_v1.png`: camadas transparentes no tamanho integral do mapa; preservam
+  os pixels e UVs originais mesmo quando o objeto ocupa somente uma região.
+- `*_camp_v1.png`: recortes-fonte de cada acampamento com máscara alfa.
+- `*_camp_depth_v1.png`: relevo exclusivo de cada acampamento.
+- `*_camp_ground_ai_v1.png`: referências de grama usadas somente sob as máscaras;
+  lanes, pontes e pixels externos não são consumidos.
 - `tools/build_travessia_depth.gd`: geração determinística do mapa de altura a
   partir dos pixels aprovados; não usa geração criativa nem redesenha objetos.
 - `tools/build_upper_left_camp_module.gd`: reconstrói os quatro assets da primeira
   separação de jungle de forma repetível.
+- `tools/build_remaining_camp_modules.gd`: produz os três módulos restantes e a
+  base compartilhada V5 de forma repetível.
+- `tools/build_full_canvas_camp_modules.gd`: converte os quatro recortes de
+  jungle para camadas integrais perfeitamente alinhadas à malha principal.
+- `tools/build_complete_map_modules.gd`: separa deterministicamente limites,
+  florestas, margens, ilha e pontes e recompõe o chão compartilhado V6.
 - `tower_platform_v1.png`: plataforma modular transparente.
 - `scenes/world/modular_bridge_3d.tscn`: cena de ponte 3D reutilizável. Comprimento,
   direção e largura são configuráveis; o piso é gerado por quatro fileiras
@@ -87,5 +103,6 @@ e profundidade física em geometria. Isso evita perder identidade visual durante
 a migração. Elementos que precisam mudar durante a partida — estruturas,
 plataformas, personagens, ovo, dragão e pontes dinâmicas — permanecem separados.
 
-Refinamentos futuros devem melhorar o mapa de altura ou extrair uma camada da
-própria arte. Não se deve substituir o mapa por um greybox procedural.
+Refinamentos futuros devem produzir relevo local quando uma grande peça precisar
+ser movida fisicamente. Para troca, ocultação e repintura, as camadas atuais já
+são independentes. Não se deve substituir o mapa por um greybox procedural.

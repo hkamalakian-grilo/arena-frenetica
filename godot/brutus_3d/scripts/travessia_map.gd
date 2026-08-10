@@ -5,12 +5,35 @@ extends Node3D
 ## Gameplay positions live in TravessiaDefinition, so this node can later be
 ## replaced by authored terrain, vegetation and props without rewriting rules.
 
-const TERRAIN_ART := preload("res://assets/maps/travessia_terrain_v4.png")
-const TERRAIN_DEPTH := preload("res://assets/maps/travessia_depth_v2.png")
+const TERRAIN_ART := preload("res://assets/maps/travessia_terrain_v6.png")
+const TERRAIN_DEPTH := preload("res://assets/maps/travessia_depth_v1.png")
+const MODULE_DEPTH := preload("res://assets/maps/travessia_depth_v1.png")
 const UPPER_LEFT_CAMP_ART := preload(
-	"res://assets/maps/upper_left_camp_v1.png")
-const UPPER_LEFT_CAMP_DEPTH := preload(
-	"res://assets/maps/upper_left_camp_depth_v1.png")
+	"res://assets/maps/upper_left_camp_full_v1.png")
+const UPPER_RIGHT_CAMP_ART := preload(
+	"res://assets/maps/upper_right_camp_full_v1.png")
+const LOWER_LEFT_CAMP_ART := preload(
+	"res://assets/maps/lower_left_camp_full_v1.png")
+const LOWER_RIGHT_CAMP_ART := preload(
+	"res://assets/maps/lower_right_camp_full_v1.png")
+const NORTH_BOUNDARY_ART := preload(
+	"res://assets/maps/north_boundary_full_v1.png")
+const SOUTH_BOUNDARY_ART := preload(
+	"res://assets/maps/south_boundary_full_v1.png")
+const WEST_OUTER_FOREST_ART := preload(
+	"res://assets/maps/west_outer_forest_full_v1.png")
+const EAST_OUTER_FOREST_ART := preload(
+	"res://assets/maps/east_outer_forest_full_v1.png")
+const NORTH_RIVER_BANK_ART := preload(
+	"res://assets/maps/north_river_bank_full_v1.png")
+const SOUTH_RIVER_BANK_ART := preload(
+	"res://assets/maps/south_river_bank_full_v1.png")
+const DRAGON_ISLAND_ART := preload(
+	"res://assets/maps/dragon_island_full_v1.png")
+const LEFT_LANE_BRIDGE_ART := preload(
+	"res://assets/maps/left_lane_bridge_full_v1.png")
+const RIGHT_LANE_BRIDGE_ART := preload(
+	"res://assets/maps/right_lane_bridge_full_v1.png")
 const TOWER_PLATFORM_ART := preload("res://assets/maps/tower_platform_v1.png")
 const MODULAR_BRIDGE_SCENE := preload(
 	"res://scenes/world/modular_bridge_3d.tscn")
@@ -23,8 +46,10 @@ const SOUTH_GATE_EDGE_Z := 3.36
 const SOUTH_ISLAND_ENTRY_Z := 1.95
 const TOWER_PLATFORM_REGION := Rect2(136, 206, 1000, 820)
 const TOWER_PLATFORM_WIDTH := 1.92
-const SOURCE_MAP_SIZE := Vector2(913.0, 1723.0)
 const UPPER_LEFT_CAMP_REGION := Rect2(175.0, 300.0, 320.0, 360.0)
+const UPPER_RIGHT_CAMP_REGION := Rect2(418.0, 300.0, 320.0, 360.0)
+const LOWER_LEFT_CAMP_REGION := Rect2(175.0, 980.0, 320.0, 450.0)
+const LOWER_RIGHT_CAMP_REGION := Rect2(418.0, 980.0, 320.0, 450.0)
 
 var dragon_access: Node3D
 var terrain_layer: Node3D
@@ -39,7 +64,8 @@ func build() -> void:
 	_create_visual_layers()
 	_build_environment()
 	_add_terrain_art()
-	_add_upper_left_camp_module()
+	_add_static_art_modules()
+	_add_jungle_modules()
 	_add_tower_platforms()
 	_add_floor_collision()
 	_add_boundary_collisions()
@@ -103,37 +129,70 @@ func uses_canonical_2_5d_art() -> bool:
 	return true
 
 
-func _add_upper_left_camp_module() -> void:
+func _add_static_art_modules() -> void:
+	var modules := Node3D.new()
+	modules.name = "MapArtModules"
+	static_props.add_child(modules)
+	_add_full_map_art_module(modules, "NorthBoundary", NORTH_BOUNDARY_ART,
+		&"boundary")
+	_add_full_map_art_module(modules, "SouthBoundary", SOUTH_BOUNDARY_ART,
+		&"boundary")
+	_add_full_map_art_module(modules, "WestOuterForest",
+		WEST_OUTER_FOREST_ART, &"outer_forest")
+	_add_full_map_art_module(modules, "EastOuterForest",
+		EAST_OUTER_FOREST_ART, &"outer_forest")
+	_add_full_map_art_module(modules, "NorthRiverBank",
+		NORTH_RIVER_BANK_ART, &"river_bank")
+	_add_full_map_art_module(modules, "SouthRiverBank",
+		SOUTH_RIVER_BANK_ART, &"river_bank")
+	_add_full_map_art_module(modules, "DragonIsland", DRAGON_ISLAND_ART,
+		&"dragon_island")
+	_add_full_map_art_module(modules, "LeftLaneBridge", LEFT_LANE_BRIDGE_ART,
+		&"lane_bridge")
+	_add_full_map_art_module(modules, "RightLaneBridge", RIGHT_LANE_BRIDGE_ART,
+		&"lane_bridge")
+
+
+func _add_jungle_modules() -> void:
 	var jungle_modules := Node3D.new()
 	jungle_modules.name = "JungleModules"
 	static_props.add_child(jungle_modules)
-	var camp := MeshInstance3D.new()
-	camp.name = "UpperLeftCamp"
+	_add_jungle_camp_module(jungle_modules, "UpperLeftCamp",
+		UPPER_LEFT_CAMP_ART, UPPER_LEFT_CAMP_REGION)
+	_add_jungle_camp_module(jungle_modules, "UpperRightCamp",
+		UPPER_RIGHT_CAMP_ART, UPPER_RIGHT_CAMP_REGION)
+	_add_jungle_camp_module(jungle_modules, "LowerLeftCamp",
+		LOWER_LEFT_CAMP_ART, LOWER_LEFT_CAMP_REGION)
+	_add_jungle_camp_module(jungle_modules, "LowerRightCamp",
+		LOWER_RIGHT_CAMP_ART, LOWER_RIGHT_CAMP_REGION)
+
+
+func _add_jungle_camp_module(parent: Node3D, node_name: String,
+		camp_art: Texture2D, region: Rect2) -> void:
+	var camp := _add_full_map_art_module(parent, node_name, camp_art,
+		&"jungle_camp", 0.004)
+	camp.set_meta("source_region", region)
+
+
+func _add_full_map_art_module(parent: Node3D, node_name: String,
+		module_art: Texture2D, module_kind: StringName,
+		y_offset: float = 0.003) -> MeshInstance3D:
+	var module := MeshInstance3D.new()
+	module.name = node_name
 	var mesh := PlaneMesh.new()
-	mesh.size = Vector2(
-		UPPER_LEFT_CAMP_REGION.size.x / SOURCE_MAP_SIZE.x
-			* TravessiaDefinition.MAP_SIZE.x,
-		UPPER_LEFT_CAMP_REGION.size.y / SOURCE_MAP_SIZE.y
-			* TravessiaDefinition.MAP_SIZE.y)
-	mesh.subdivide_width = 31
-	mesh.subdivide_depth = 35
-	camp.mesh = mesh
-	var center_pixel := UPPER_LEFT_CAMP_REGION.position \
-		+ UPPER_LEFT_CAMP_REGION.size * 0.5
-	camp.position = Vector3(
-		(center_pixel.x / SOURCE_MAP_SIZE.x - 0.5)
-			* TravessiaDefinition.MAP_SIZE.x,
-		0.018,
-		(center_pixel.y / SOURCE_MAP_SIZE.y - 0.5)
-			* TravessiaDefinition.MAP_SIZE.y)
+	mesh.size = TravessiaDefinition.MAP_SIZE
+	mesh.subdivide_width = 95
+	mesh.subdivide_depth = 191
+	module.mesh = mesh
+	module.position.y = y_offset
 	var shader := Shader.new()
 	shader.code = """
 shader_type spatial;
-render_mode cull_disabled, unshaded, depth_prepass_alpha;
+render_mode cull_disabled, unshaded;
 
-uniform sampler2D camp_texture : source_color, filter_linear_mipmap_anisotropic;
+uniform sampler2D module_texture : source_color, filter_linear_mipmap_anisotropic;
 uniform sampler2D height_texture : filter_linear;
-uniform float height_scale = 0.50;
+uniform float height_scale = 0.62;
 
 void vertex() {
 	float authored_height = textureLod(height_texture, UV, 0.0).r;
@@ -141,21 +200,22 @@ void vertex() {
 }
 
 void fragment() {
-	vec4 approved_art = texture(camp_texture, UV);
+	vec4 approved_art = texture(module_texture, UV);
 	ALBEDO = approved_art.rgb;
 	ALPHA = approved_art.a;
+	ALPHA_SCISSOR_THRESHOLD = 0.05;
 }
 """
 	var material := ShaderMaterial.new()
 	material.shader = shader
-	material.set_shader_parameter("camp_texture", UPPER_LEFT_CAMP_ART)
-	material.set_shader_parameter("height_texture", UPPER_LEFT_CAMP_DEPTH)
-	material.set_shader_parameter("height_scale", 0.50)
-	camp.material_override = material
-	camp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	camp.set_meta("source_region", UPPER_LEFT_CAMP_REGION)
-	camp.set_meta("module_kind", &"jungle_camp")
-	jungle_modules.add_child(camp)
+	material.set_shader_parameter("module_texture", module_art)
+	material.set_shader_parameter("height_texture", MODULE_DEPTH)
+	material.set_shader_parameter("height_scale", 0.62)
+	module.material_override = material
+	module.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	module.set_meta("module_kind", module_kind)
+	parent.add_child(module)
+	return module
 
 
 func _add_tower_platforms() -> void:
