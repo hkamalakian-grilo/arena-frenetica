@@ -12,13 +12,9 @@ func _initialize() -> void:
 func _run_preview() -> void:
 	root.size = Vector2i(720, 1280)
 	var scene := load("res://main.tscn") as PackedScene
-	while true:
-		var game := scene.instantiate()
-		root.add_child(game)
-		await create_timer(2.0, true, false, true).timeout
-		game.match_time = float(game.match_rules.match_duration) \
-			- float(game.match_rules.dragon_hatch_remaining)
-		game.call("_hatch_dragon")
-		await create_timer(5.0, true, false, true).timeout
-		game.queue_free()
-		await process_frame
+	var game := scene.instantiate()
+	root.add_child(game)
+	await create_timer(2.0, true, false, true).timeout
+	game.match_time = float(game.match_rules.match_duration) \
+		- float(game.match_rules.dragon_hatch_remaining)
+	game.call("_hatch_dragon")

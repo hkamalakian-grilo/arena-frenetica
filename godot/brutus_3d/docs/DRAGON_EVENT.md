@@ -21,7 +21,11 @@
    aprovada. O tabuleiro possui espessura 3D discreta e encaixa sob as muralhas.
    A colisão e a máscara caminhável permanecem bloqueadas até as duas pontes
    terminarem a construção.
-4. O dragão nasce no ponto central e passa a ser um objetivo neutro atacável.
+4. A camada `DragonIsland` troca para `dragon_island_open_full_v1.png`. Apenas
+   os corredores norte e sul mudam: árvore e muralha fechadas dão lugar ao
+   mesmo piso de alvenaria amostrado da ponte lateral. A ponte dinâmica termina
+   na borda e encontra essa continuação, sem sobreposição sobre o dragão.
+5. O dragão nasce no ponto central e passa a ser um objetivo neutro atacável.
 
 ## Fonte dos parâmetros
 

@@ -30,6 +30,8 @@ const SOUTH_RIVER_BANK_ART := preload(
 	"res://assets/maps/south_river_bank_full_v1.png")
 const DRAGON_ISLAND_ART := preload(
 	"res://assets/maps/dragon_island_full_v1.png")
+const DRAGON_ISLAND_OPEN_ART := preload(
+	"res://assets/maps/dragon_island_open_full_v1.png")
 const LEFT_LANE_BRIDGE_ART := preload(
 	"res://assets/maps/left_lane_bridge_full_v1.png")
 const RIGHT_LANE_BRIDGE_ART := preload(
@@ -38,7 +40,8 @@ const TOWER_PLATFORM_ART := preload("res://assets/maps/tower_platform_v1.png")
 const MODULAR_BRIDGE_SCENE := preload(
 	"res://scenes/world/modular_bridge_3d.tscn")
 const DRAGON_BRIDGE_WIDTH := 2.06
-const DRAGON_BRIDGE_ISLAND_OVERLAP := 0.20
+const DRAGON_BRIDGE_GATE_OVERLAP := 0.10
+const DRAGON_BRIDGE_ISLAND_OVERLAP := 0.02
 const NORTH_BRIDGE_START_SCALE := 0.93
 const NORTH_GATE_EDGE_Z := -4.38
 const NORTH_ISLAND_ENTRY_Z := -2.67
@@ -57,6 +60,7 @@ var static_props: Node3D
 var dynamic_props: Node3D
 var tower_platforms: Dictionary = {}
 var dragon_bridges_ready := 0
+var dragon_island_module: MeshInstance3D
 
 
 func build() -> void:
@@ -146,8 +150,8 @@ func _add_static_art_modules() -> void:
 		NORTH_RIVER_BANK_ART, &"river_bank")
 	_add_full_map_art_module(modules, "SouthRiverBank",
 		SOUTH_RIVER_BANK_ART, &"river_bank")
-	_add_full_map_art_module(modules, "DragonIsland", DRAGON_ISLAND_ART,
-		&"dragon_island")
+	dragon_island_module = _add_full_map_art_module(modules, "DragonIsland",
+		DRAGON_ISLAND_ART, &"dragon_island")
 	_add_full_map_art_module(modules, "LeftLaneBridge", LEFT_LANE_BRIDGE_ART,
 		&"lane_bridge")
 	_add_full_map_art_module(modules, "RightLaneBridge", RIGHT_LANE_BRIDGE_ART,
@@ -352,6 +356,7 @@ func _add_boundary(parent: Node3D, node_name: String, at_position: Vector3,
 func open_dragon_access(duration: float = 1.2) -> void:
 	if dragon_access != null:
 		return
+	_open_dragon_island_entrances()
 	dragon_access = Node3D.new()
 	dragon_bridges_ready = 0
 	dragon_access.name = "DragonAccessBridges"
@@ -362,6 +367,14 @@ func open_dragon_access(duration: float = 1.2) -> void:
 		SOUTH_ISLAND_ENTRY_Z, duration)
 
 
+func _open_dragon_island_entrances() -> void:
+	if dragon_island_module == null:
+		return
+	var material := dragon_island_module.material_override as ShaderMaterial
+	if material != null:
+		material.set_shader_parameter("module_texture", DRAGON_ISLAND_OPEN_ART)
+
+
 func is_dragon_access_open() -> bool:
 	return dragon_access != null and dragon_bridges_ready >= 2
 
@@ -370,12 +383,14 @@ func _build_dragon_bridge(node_name: String, gate_edge_z: float,
 		island_entry_z: float, duration: float) -> Node3D:
 	var bridge := MODULAR_BRIDGE_SCENE.instantiate() as ModularBridge3D
 	bridge.name = node_name
-	bridge.position = Vector3(0, 0.004, gate_edge_z)
-	dragon_access.add_child(bridge)
 	var growth_direction := signf(island_entry_z - gate_edge_z)
+	var bridge_start := gate_edge_z \
+		- growth_direction * DRAGON_BRIDGE_GATE_OVERLAP
+	bridge.position = Vector3(0, 0.004, bridge_start)
+	dragon_access.add_child(bridge)
 	var blended_island_entry := island_entry_z \
 		+ growth_direction * DRAGON_BRIDGE_ISLAND_OVERLAP
-	var bridge_length := absf(blended_island_entry - gate_edge_z)
+	var bridge_length := absf(blended_island_entry - bridge_start)
 	var start_scale := NORTH_BRIDGE_START_SCALE \
 		if node_name == "NorthBridge" else 1.0
 	bridge.configure(bridge_length, growth_direction, DRAGON_BRIDGE_WIDTH,

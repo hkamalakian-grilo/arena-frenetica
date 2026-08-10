@@ -215,6 +215,13 @@ func _run() -> void:
 	assert(game.get_node_or_null(
 		"TravessiaMap/DynamicProps/DragonAccessBridges") != null,
 		"Central access bridges were not created during the hatch event")
+	var open_island_material := game.arena_map.dragon_island_module \
+		.material_override as ShaderMaterial
+	var open_island_texture := open_island_material.get_shader_parameter(
+		"module_texture") as Texture2D
+	assert(open_island_texture.resource_path.ends_with(
+		"dragon_island_open_full_v1.png"),
+		"Dragon hatch must switch the island to its open-entrance layer")
 	assert(not game.arena_map.is_dragon_access_open(),
 		"Dragon access must remain blocked while the bridges are assembling")
 	await create_timer(1.5).timeout
