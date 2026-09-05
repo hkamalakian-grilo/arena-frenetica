@@ -456,7 +456,7 @@ func _add_team_ring() -> void:
 func _tune_model_materials(model: Node) -> void:
 	# Cartoon look: hard lighting steps plus a dark silhouette. The model is
 	# scaled by 0.56, so the outline width is given in model units.
-	ToonStyle.apply(model, 0.06)
+	ToonStyle.apply(model, 0.045)
 	ToonStyle.add_blob_shadow(self, 1.35)
 
 
@@ -654,7 +654,7 @@ func _launch_shield() -> void:
 	shield_hand_mesh.visible = false
 	shield_projectile = SHIELD_SCENE.instantiate()
 	shield_projectile.name = "ThrownShield"
-	ToonStyle.apply(shield_projectile, 0.05)
+	ToonStyle.apply(shield_projectile, 0.04)
 	get_parent().add_child(shield_projectile)
 	Vfx.trail(shield_projectile, Color(0.85, 0.55, 1.0, 0.9), 0.18, 30)
 	Vfx.flash(get_parent(), global_position + Vector3(0, 1.4, 0), Color(0.85, 0.6, 1.0, 0.9), 0.9, 0.16)

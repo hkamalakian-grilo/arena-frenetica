@@ -47,13 +47,13 @@ var charge_hit_ids: Array = []
 var last_brutus_health := -1.0
 ## Close brawler camera (see docs/PRESENTATION.md). The camera rig may travel
 ## this far from the centre before the painted map edge would show.
-const CAMERA_LIMIT := Vector2(5.0, 8.8)
-const CAMERA_LIMIT_Z_MIN := -8.8
-const CAMERA_LIMIT_Z_MAX := 8.8
+const CAMERA_LIMIT := Vector2(5.0, 8.4)
+const CAMERA_LIMIT_Z_MIN := -8.4
+const CAMERA_LIMIT_Z_MAX := 8.4
 const CAMERA_LEAD := 0.9
 const CAMERA_FOLLOW_SPEED := 6.0
-const CLOSE_CAMERA_POSITION := Vector3(0, 26, 15)
-const CLOSE_CAMERA_TILT := -60.0
+const CLOSE_CAMERA_POSITION := Vector3(0, 26, 18.2)
+const CLOSE_CAMERA_TILT := -55.0
 const CLOSE_CAMERA_SIZE := 14.0
 const FULL_CAMERA_POSITION := Vector3(0, 36, 9.65)
 const FULL_CAMERA_TILT := -75.0

@@ -29,7 +29,7 @@ func configure(new_actor_kind: StringName, new_variant: StringName, team: int) -
 	model_root.name = "%sModel" % String(variant).capitalize()
 	model_root.scale = Vector3.ONE * (0.82 if actor_kind == &"minion" else 1.28)
 	add_child(model_root)
-	ToonStyle.apply(model_root, 0.035 if actor_kind == &"minion" else 0.03)
+	ToonStyle.apply(model_root, 0.028 if actor_kind == &"minion" else 0.024)
 	ToonStyle.add_blob_shadow(self, 0.95 if actor_kind == &"minion" else 1.3)
 	animation_player = model_root.find_child(
 		"AnimationPlayer", true, false) as AnimationPlayer

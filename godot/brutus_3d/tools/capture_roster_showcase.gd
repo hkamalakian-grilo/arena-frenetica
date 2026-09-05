@@ -13,8 +13,11 @@ func _capture() -> void:
 	root.add_child(game)
 	for _frame in range(8):
 		await process_frame
+	# Frame the line-up with a fixed close camera instead of following Brutus.
+	game.follow_player_camera = false
+	game.get_node("CameraRig").global_position = Vector3(0, 0, -0.4)
 	var camera := game.get_node("CameraRig/Camera3D") as Camera3D
-	camera.size = 12.5
+	camera.size = 9.0
 	if is_instance_valid(game.dragon_egg):
 		game.dragon_egg.queue_free()
 	var showcase := [
@@ -39,6 +42,9 @@ func _capture() -> void:
 		minion_index += 1
 	for _frame in range(5):
 		await process_frame
+	game.get_node("CameraRig").global_position = Vector3(0, 0, -0.4)
+	camera.size = 9.0
+	await process_frame
 	var image := root.get_texture().get_image()
 	assert(image.save_png(OUTPUT) == OK, "Could not save roster showcase")
 	print("ROSTER_SHOWCASE_OK ", OUTPUT)

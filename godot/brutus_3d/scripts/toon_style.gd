@@ -1,9 +1,42 @@
 class_name ToonStyle
 extends RefCounted
 
-## Cartoon presentation shared by every character: hard two-step lighting,
-## a dark silhouette outline drawn as a second pass, and a soft blob shadow
-## on the ground. Works on the gl_compatibility renderer.
+## Cartoon presentation shared by every character: three-band cel lighting
+## with a darker underside, a dark silhouette outline drawn as a second pass,
+## and a soft blob shadow on the ground. Works on the gl_compatibility renderer.
+
+const CEL_SHADER := """
+shader_type spatial;
+render_mode cull_back, specular_disabled;
+uniform vec4 albedo : source_color = vec4(1.0);
+uniform vec4 emission_color : source_color = vec4(0.0, 0.0, 0.0, 1.0);
+uniform float emission_energy = 0.0;
+uniform float shadow_floor = 0.45;
+uniform float bands = 3.0;
+// Painted-style vertical gradient: feet sit in shade, the head catches light.
+uniform float gradient_bottom = 0.0;
+uniform float gradient_top = 1.6;
+uniform float gradient_floor = 0.62;
+
+varying float world_height;
+
+void vertex() {
+	world_height = (MODEL_MATRIX * vec4(VERTEX, 1.0)).y;
+}
+
+void fragment() {
+	float lift = smoothstep(gradient_bottom, gradient_top, world_height);
+	ALBEDO = albedo.rgb * mix(gradient_floor, 1.0, lift);
+	EMISSION = emission_color.rgb * emission_energy;
+}
+
+void light() {
+	float ndl = clamp(dot(NORMAL, LIGHT), 0.0, 1.0);
+	float stepped = floor(ndl * bands + 0.35) / bands;
+	float shade = mix(shadow_floor, 1.0, stepped);
+	DIFFUSE_LIGHT += ALBEDO * LIGHT_COLOR * ATTENUATION * shade;
+}
+"""
 
 const OUTLINE_SHADER := """
 shader_type spatial;
@@ -32,15 +65,19 @@ void fragment() {
 }
 """
 
+static var _cel_shader: Shader
 static var _outline_shader: Shader
 static var _shadow_shader: Shader
 
 
-## Replaces every StandardMaterial3D under `model` with a toon-lit copy and
+## Replaces every StandardMaterial3D under `model` with a cel-shaded copy and
 ## chains an outline pass. `outline_width` is in the model's local units.
-static func apply(model: Node, outline_width: float, saturation := 1.18) -> void:
+static func apply(model: Node, outline_width: float, saturation := 1.08) -> void:
 	if model == null:
 		return
+	if _cel_shader == null:
+		_cel_shader = Shader.new()
+		_cel_shader.code = CEL_SHADER
 	var outline := _outline_material(outline_width)
 	for child in model.find_children("*", "MeshInstance3D", true, false):
 		var mesh_instance := child as MeshInstance3D
@@ -50,14 +87,13 @@ static func apply(model: Node, outline_width: float, saturation := 1.18) -> void
 			var source := mesh_instance.get_active_material(surface_index) as StandardMaterial3D
 			if source == null:
 				continue
-			var material := source.duplicate() as StandardMaterial3D
-			material.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
-			material.specular_mode = BaseMaterial3D.SPECULAR_TOON
-			material.roughness = maxf(material.roughness, 0.7)
-			material.metallic = minf(material.metallic, 0.15)
-			material.albedo_color = _punch(material.albedo_color, saturation)
-			if material.emission_enabled:
-				material.emission_energy_multiplier = minf(material.emission_energy_multiplier, 0.8)
+			var material := ShaderMaterial.new()
+			material.shader = _cel_shader
+			material.set_shader_parameter("albedo", _punch(source.albedo_color, saturation))
+			if source.emission_enabled:
+				material.set_shader_parameter("emission_color", source.emission)
+				material.set_shader_parameter("emission_energy",
+					minf(source.emission_energy_multiplier, 0.9))
 			material.next_pass = outline
 			mesh_instance.set_surface_override_material(surface_index, material)
 
@@ -91,10 +127,10 @@ static func _outline_material(width: float) -> ShaderMaterial:
 	return material
 
 
-## Slightly more saturated and brighter mid-tones read better under the
-## flat toon lighting without touching the authored hue.
+## Slightly more saturated mid-tones read better under flat cel lighting
+## without touching the authored hue or blowing out the value.
 static func _punch(color: Color, saturation: float) -> Color:
 	var h := color.h
 	var s := clampf(color.s * saturation, 0.0, 1.0)
-	var v := clampf(color.v * 1.06, 0.0, 1.0)
+	var v := clampf(color.v, 0.0, 1.0)
 	return Color.from_hsv(h, s, v, color.a)

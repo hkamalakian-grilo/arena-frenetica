@@ -6,9 +6,23 @@ Run with Blender 5.2+:
 
 from pathlib import Path
 import math
+import sys
 
 import bpy
 from mathutils import Euler, Matrix, Vector
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from chibi_warp import Warp, warp_character  # noqa: E402
+
+# Cartoon proportions (see chibi_warp.py): the authored knight keeps every
+# armour piece, then legs shrink, the helmet grows and gauntlets/boots swell.
+CHIBI = Warp([
+    (0.0, 1.13, 0.64, 1.15),
+    (1.13, 2.42, 0.84, 1.0),
+    (2.42, 3.60, 1.18, 1.22),
+])
+PART_SCALES = {"Gauntlet": (1.4, 1.4, 1.4), "Knuckle": (1.35, 1.35, 1.35),
+               "Boot": (1.3, 1.25, 1.2)}
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -204,7 +218,11 @@ def build_body(rig):
 
 def build_head(rig):
     sphere("Head shadow", (0, 0, 2.68), (0.39, 0.35, 0.45), "black", "head", rig)
-    sphere("Helmet crown", (0, 0.02, 2.82), (0.47, 0.42, 0.49), "gold", "head", rig)
+    # Orange crown with gold trims: from the top-down camera the helmet must
+    # read as a different shape from the gold pauldrons and shield rim.
+    sphere("Helmet crown", (0, 0.02, 2.82), (0.47, 0.42, 0.49), "orange", "head", rig)
+    torus("Helmet crown rim", (0, 0.02, 2.66), 0.44, 0.045, "gold", "head", rig)
+    sphere("Helmet crest ridge", (0, 0.02, 3.02), (0.10, 0.40, 0.30), "gold", "head", rig)
     # The visor sits toward -Y (front).
     box("Visor face", (0, -0.405, 2.69), (0.78, 0.13, 0.43), "gold_dark", "head", rig, bevel=0.045)
     box("Visor eye slit", (0, -0.483, 2.76), (0.61, 0.025, 0.105), "black", "head", rig, bevel=0.015)
@@ -239,7 +257,7 @@ def build_arms(rig):
         bone_fore = f"forearm.{side}"
         bone_hand = f"hand.{side}"
         sphere(f"Pauldron {side}", (0.72 * x, 0.02, 2.28), (0.48, 0.46, 0.39),
-               "orange", bone_upper, rig)
+               "orange_dark", bone_upper, rig)
         torus(f"Pauldron rim {side}", (0.79 * x, -0.18, 2.28), 0.39, 0.055,
               "gold", bone_upper, rig, rot=(math.pi / 2, 0, 0))
         sphere(f"Upper arm mail {side}", (0.92 * x, 0.0, 1.92), (0.29, 0.27, 0.39),
@@ -331,9 +349,17 @@ def join_mesh_group(meshes, name):
 
 def export_standalone_shield():
     """Export a centered shield scene for the returning projectile visual."""
-    shield_center = Vector((-0.96, -0.49, 1.63))
     source_parts = [obj for obj in bpy.context.scene.objects
                     if obj.type == "MESH" and obj.get("rig_bone") == "shield"]
+    # Centre on the warped shield: the projectile spins around its own middle.
+    lows = Vector((1e9, 1e9, 1e9))
+    highs = Vector((-1e9, -1e9, -1e9))
+    for source in source_parts:
+        for vertex in source.data.vertices:
+            world = source.matrix_world @ vertex.co
+            lows = Vector((min(lows.x, world.x), min(lows.y, world.y), min(lows.z, world.z)))
+            highs = Vector((max(highs.x, world.x), max(highs.y, world.y), max(highs.z, world.z)))
+    shield_center = (lows + highs) * 0.5
     duplicates = []
     for source in source_parts:
         duplicate = source.copy()
@@ -898,6 +924,8 @@ def main():
     build_arms(rig)
     build_legs(rig)
     build_shield(rig)
+    warp_character(rig, [obj for obj in bpy.context.scene.objects if obj.type == "MESH"],
+                   CHIBI, PART_SCALES)
     export_standalone_shield()
     join_character_meshes(rig)
     build_animations(rig)

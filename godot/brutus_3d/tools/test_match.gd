@@ -61,7 +61,7 @@ func _run() -> void:
 	brutus.global_position = Vector3(-8.0, 0.0, -16.0)
 	game.snap_camera_to_player()
 	var rig := game.get_node("CameraRig") as Node3D
-	assert(absf(rig.global_position.x) <= 5.0 + 0.01 and rig.global_position.z >= -8.8 - 0.01,
+	assert(absf(rig.global_position.x) <= 5.0 + 0.01 and rig.global_position.z >= -8.4 - 0.01,
 		"Camera rig must clamp so the map edge never shows")
 	brutus.global_position = TravessiaDefinition.PLAYER_SPAWN
 	game.snap_camera_to_player()
@@ -70,10 +70,10 @@ func _run() -> void:
 		var mesh_instance := child as MeshInstance3D
 		if mesh_instance.mesh == null or mesh_instance.mesh.get_surface_count() == 0:
 			continue
-		var material := mesh_instance.get_active_material(0) as StandardMaterial3D
-		if material != null and material.diffuse_mode == BaseMaterial3D.DIFFUSE_TOON 				and material.next_pass is ShaderMaterial:
+		var material := mesh_instance.get_active_material(0) as ShaderMaterial
+		if material != null and material.shader != null 				and material.shader.code.contains("void light()") 				and material.next_pass is ShaderMaterial:
 			outlined += 1
-	assert(outlined > 0, "Brutus must use toon lighting with an outline pass")
+	assert(outlined > 0, "Brutus must use cel lighting with an outline pass")
 	assert(brutus.get_node_or_null("BlobShadow") != null, "Brutus needs a ground blob shadow")
 	var terrain_art := game.get_node(
 		"TravessiaMap/TerrainLayer/TerrainArt") as MeshInstance3D

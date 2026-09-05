@@ -15,11 +15,53 @@ from build_dragon_family import (
     diamond, curve_line, create_rig, parent_to_bone, new_action, key_bone,
     finish_action, export_asset,
 )
+from chibi_warp import Warp, warp_character
+
+import bpy
 
 
 ROOT = Path(__file__).resolve().parents[1]
 ASSET_DIR = ROOT / "assets" / "roster"
 ASSET_DIR.mkdir(parents=True, exist_ok=True)
+
+# Cartoon proportions applied after authoring (see chibi_warp.py): short
+# chunky legs, compact torso, a head almost half the body, big hands and boots.
+CHIBI = Warp([
+    (0.0, 0.76, 0.62, 1.20),
+    (0.76, 1.50, 0.86, 1.06),
+    (1.50, 2.60, 1.15, 1.26),
+])
+PART_SCALES = {"Hand": (1.55, 1.55, 1.55), "Boot": (1.35, 1.3, 1.25)}
+
+
+def chibify(rig):
+    objects = [obj for obj in bpy.context.scene.objects
+               if obj.type in {"MESH", "CURVE"} and not obj.name.startswith("PREVIEW_ONLY_")]
+    warp_character(rig, objects, CHIBI, PART_SCALES)
+
+
+def add_cartoon_eyes(rig, mats, hero, glow=False, y=-0.33, z=1.80, spacing=0.09, brow=0.0):
+    """Big readable eyes: white sclera, dark pupil, small highlight, brows.
+
+    `brow` tilts the eyebrows (positive = angry inner tilt, negative = kind).
+    """
+    pupil_mat = mats["glow"] if glow else mats["pupil"]
+    for side in (-1, 1):
+        x = spacing * side
+        sclera = uv_sphere(f"{hero}EyeWhite.{side}", (x, y, z), (0.082, 0.05, 0.095), mats["eye_white"], 16, 10)
+        pupil = ico(f"{hero}Pupil.{side}", (x + 0.006 * side, y - 0.038, z - 0.005), (0.042, 0.022, 0.052), pupil_mat, 2)
+        shine = ico(f"{hero}EyeShine.{side}", (x - 0.02 * side, y - 0.06, z + 0.025), (0.016, 0.01, 0.018), mats["eye_white"], 1)
+        eyebrow = box(f"{hero}Brow.{side}", (x, y - 0.01, z + 0.115), (0.10, 0.028, 0.026), mats["pupil"],
+                      rot=(0, math.radians(brow * side), 0), bevel=0.006)
+        for obj in (sclera, pupil, shine, eyebrow):
+            parent_to_bone(obj, rig, "head")
+    mouth = box(f"{hero}Mouth", (0, y - 0.005, z - 0.135), (0.075, 0.02, 0.018), mats["pupil"], bevel=0.005)
+    parent_to_bone(mouth, rig, "head")
+
+
+def squash(amount):
+    """Root scale key for squash (amount > 0) or stretch (amount < 0)."""
+    return (1.0 + amount, 1.0 + amount, 1.0 - amount * 1.3)
 
 
 def roster_materials(hero):
@@ -28,6 +70,8 @@ def roster_materials(hero):
         "gold": material(f"{hero} Antique Gold", (0.63, 0.31, 0.055), metallic=0.72, roughness=0.34),
         "leather": material(f"{hero} Leather", (0.20, 0.075, 0.025), roughness=0.80),
         "steel": material(f"{hero} Steel", (0.34, 0.42, 0.50), metallic=0.76, roughness=0.28),
+        "eye_white": material(f"{hero} Eye White", (0.94, 0.94, 0.90), roughness=0.30),
+        "pupil": material(f"{hero} Pupil", (0.02, 0.02, 0.03), roughness=0.40),
     }
     if hero == "Lyra":
         common.update({
@@ -83,7 +127,7 @@ def add_human_limbs(rig, mats, slender=False):
 def add_hero_animations(rig, hero):
     idle = new_action(rig, "idle")
     for frame, pulse in ((1, 0.0), (20, 1.0), (40, 0.0)):
-        key_bone(rig, "root", frame, loc=(0, 0, 0.025 * pulse))
+        key_bone(rig, "root", frame, loc=(0, 0, 0.025 * pulse), scale=squash(-0.012 * pulse))
         key_bone(rig, "torso", frame, rot=(math.radians(1.5 * pulse), 0, math.radians(-1.5 + 3 * pulse)))
         key_bone(rig, "head", frame, rot=(math.radians(-1 + 2 * pulse), 0, math.radians(1 - 2 * pulse)))
         key_bone(rig, "arm.L", frame, rot=(math.radians(-3 + pulse * 3), 0, math.radians(-5)))
@@ -92,7 +136,9 @@ def add_hero_animations(rig, hero):
 
     run = new_action(rig, "run")
     for frame, phase in ((1, 0), (8, 1), (16, 0), (24, -1), (32, 0)):
-        key_bone(rig, "root", frame, loc=(0, -0.04 * abs(phase), 0.055 * abs(phase)), rot=(math.radians(7), 0, 0))
+        # Contact frames squash, passing frames stretch: cartoon bounce.
+        key_bone(rig, "root", frame, loc=(0, -0.04 * abs(phase), 0.055 * abs(phase)), rot=(math.radians(7), 0, 0),
+                 scale=squash(0.06 * abs(phase) - 0.03))
         key_bone(rig, "torso", frame, rot=(math.radians(-5), 0, math.radians(4 * phase)))
         key_bone(rig, "arm.L", frame, rot=(math.radians(-34 * phase), 0, math.radians(-6)))
         key_bone(rig, "arm.R", frame, rot=(math.radians(34 * phase), 0, math.radians(6)))
@@ -102,7 +148,9 @@ def add_hero_animations(rig, hero):
 
     attack = new_action(rig, "attack")
     for frame, force in ((1, 0.0), (8, -0.35), (16, 1.0), (26, 0.0)):
-        key_bone(rig, "root", frame, loc=(0, -0.12 * max(force, 0), 0))
+        # Anticipation squashes, the hit stretches forward.
+        key_bone(rig, "root", frame, loc=(0, -0.12 * max(force, 0), 0),
+                 scale=squash(0.07 if force < 0 else -0.06 * force))
         key_bone(rig, "torso", frame, rot=(math.radians(-8 * max(force, 0)), 0, math.radians(18 * force)))
         if hero == "Lyra":
             key_bone(rig, "arm.L", frame, rot=(math.radians(-70 * max(force, 0)), math.radians(-12), math.radians(-42)))
@@ -120,7 +168,8 @@ def add_hero_animations(rig, hero):
     for action, power, end in ((q, 1.0, 34), (ultimate, 1.5, 52)):
         rig.animation_data.action = action
         for frame, force in ((1, 0.0), (10, -0.18), (22, power), (end, 0.0)):
-            key_bone(rig, "root", frame, loc=(0, -0.12 * max(force, 0), 0.10 * max(force, 0)))
+            key_bone(rig, "root", frame, loc=(0, -0.12 * max(force, 0), 0.10 * max(force, 0)),
+                     scale=squash(0.08 if force < 0 else -0.05 * force))
             key_bone(rig, "torso", frame, rot=(math.radians(-7 * force), 0, math.radians(14 * force)))
             key_bone(rig, "head", frame, rot=(math.radians(8 * force), 0, 0))
             key_bone(rig, "arm.L", frame, rot=(math.radians(-65 * force), math.radians(-20 * force), math.radians(-30)))
@@ -129,7 +178,8 @@ def add_hero_animations(rig, hero):
 
     hurt = new_action(rig, "hurt")
     for frame, recoil in ((1, 0), (6, 1), (13, -0.2), (20, 0)):
-        key_bone(rig, "root", frame, loc=(0, 0.10 * recoil, 0), rot=(0, 0, math.radians(8 * recoil)))
+        key_bone(rig, "root", frame, loc=(0, 0.10 * recoil, 0), rot=(0, 0, math.radians(8 * recoil)),
+                 scale=squash(0.09 * recoil))
         key_bone(rig, "torso", frame, rot=(math.radians(13 * recoil), 0, math.radians(-8 * recoil)))
         key_bone(rig, "head", frame, rot=(math.radians(-8 * recoil), 0, 0))
     finish_action(hurt, 1, 20)
@@ -175,10 +225,9 @@ def build_lyra():
         shoulder = ico(f"LyraShoulder.{side}", (0.40 * side, 0, 1.40), (0.20, 0.24, 0.16), mats["gold"], 1)
         parent_to_bone(ear, rig, "head")
         parent_to_bone(shoulder, rig, "torso")
-        eye = ico(f"LyraEye.{side}", (0.080 * side, -0.326, 1.80), (0.034, 0.018, 0.050), mats["glow"], 1)
-        parent_to_bone(eye, rig, "head")
+    add_cartoon_eyes(rig, mats, "Lyra", brow=14.0)
     for index, x in enumerate((-0.10, 0.0, 0.10)):
-        bang = ico(f"LyraHair{index+1}", (x, -0.305, 1.94), (0.075, 0.028, 0.105), mats["gold"], 1)
+        bang = ico(f"LyraHair{index+1}", (x, -0.305, 1.96), (0.075, 0.028, 0.105), mats["gold"], 1)
         parent_to_bone(bang, rig, "head")
     add_human_limbs(rig, mats, slender=True)
     bow = curve_line("LyraBow", [(-0.72, -0.16, 1.42), (-0.92, -0.20, 1.05), (-0.74, -0.18, 0.66)], 0.055, mats["gold"])
@@ -192,6 +241,7 @@ def build_lyra():
     for index in range(3):
         shaft = cylinder(f"LyraQuiverArrow{index+1}", (0.23 + index * 0.07, 0.25, 1.59), 0.015, 0.58, mats["steel"], rot=(0, math.radians(18), 0), vertices=6)
         parent_to_bone(shaft, rig, "torso")
+    chibify(rig)
     add_hero_animations(rig, "Lyra")
     return rig
 
@@ -204,10 +254,14 @@ def build_nix():
     torso = ico("NixTorso", (0, 0, 1.12), (0.38, 0.27, 0.50), mats["primary"], 2)
     hood = ico("NixHood", (0, 0.03, 1.82), (0.36, 0.31, 0.39), mats["secondary"], 2)
     void_face = ico("NixVoidFace", (0, -0.23, 1.76), (0.22, 0.075, 0.23), mats["primary"], 2)
-    eye = diamond("NixEye", (0, -0.32, 1.80), (0.13, 0.03, 0.065), mats["glow"])
     belt = box("NixBelt", (0, 0, 0.82), (0.40, 0.19, 0.10), mats["gold"], bevel=0.025)
-    for obj, bone in ((torso, "torso"), (hood, "head"), (void_face, "head"), (eye, "head"), (belt, "hips")):
+    for obj, bone in ((torso, "torso"), (hood, "head"), (void_face, "head"), (belt, "hips")):
         parent_to_bone(obj, rig, bone)
+    # Two narrowed glowing eyes inside the hood read as a predator's stare.
+    for side in (-1, 1):
+        eye = diamond(f"NixEye.{side}", (0.09 * side, -0.375, 1.80), (0.095, 0.05, 0.05), mats["glow"],
+                      rot=(0, math.radians(-18 * side), 0))
+        parent_to_bone(eye, rig, "head")
     for side in (-1, 1):
         shoulder = diamond(f"NixShoulder.{side}", (0.42 * side, -0.02, 1.43), (0.23, 0.18, 0.22), mats["secondary"])
         parent_to_bone(shoulder, rig, "torso")
@@ -217,6 +271,7 @@ def build_nix():
         hilt = box(f"NixHilt.{side}", (0.44 * side, -0.04, 0.75), (0.22, 0.07, 0.06), mats["gold"], bevel=0.02)
         parent_to_bone(blade, rig, bone)
         parent_to_bone(hilt, rig, bone)
+    chibify(rig)
     add_hero_animations(rig, "Nix")
     return rig
 
@@ -232,11 +287,9 @@ def build_sol():
     chest = diamond("SolChestSun", (0, -0.31, 1.38), (0.15, 0.04, 0.18), mats["glow"])
     for obj, bone in ((robe, "hips"), (mantle, "torso"), (hood, "head"), (face, "head"), (chest, "torso")):
         parent_to_bone(obj, rig, bone)
-    for side in (-1, 1):
-        eye = ico(f"SolEye.{side}", (0.080 * side, -0.326, 1.80), (0.034, 0.018, 0.050), mats["leather"], 1)
-        parent_to_bone(eye, rig, "head")
+    add_cartoon_eyes(rig, mats, "Sol", brow=-10.0)
     for index, x in enumerate((-0.10, 0.0, 0.10)):
-        bang = ico(f"SolHair{index+1}", (x, -0.305, 1.94), (0.075, 0.028, 0.105), mats["primary"], 1)
+        bang = ico(f"SolHair{index+1}", (x, -0.305, 1.96), (0.075, 0.028, 0.105), mats["primary"], 1)
         parent_to_bone(bang, rig, "head")
     add_human_limbs(rig, mats, slender=False)
     halo = torus("SolHalo", (0, 0.03, 2.30), 0.35, 0.035, mats["glow"])
@@ -252,6 +305,7 @@ def build_sol():
         rays.append(ray)
     for obj in (staff, staff_orb, *rays): parent_to_bone(obj, rig, "arm.L")
     parent_to_bone(hand_orb, rig, "arm.R")
+    chibify(rig)
     add_hero_animations(rig, "Sol")
     return rig
 
@@ -267,6 +321,8 @@ def minion_materials(team):
         "gold": material(f"Minion {team} Gold", (0.62, 0.34, 0.06), metallic=0.68, roughness=0.34),
         "skin": material(f"Minion {team} Skin", (0.48, 0.22, 0.10), roughness=0.76),
         "glow": material(f"Minion {team} Glow", (0.12, 0.72, 1.0) if blue else (1.0, 0.16, 0.20), emission=1.5),
+        "eye_white": material(f"Minion {team} Eye White", (0.94, 0.94, 0.90), roughness=0.30),
+        "pupil": material(f"Minion {team} Pupil", (0.02, 0.02, 0.03), roughness=0.40),
     }
 
 
@@ -282,6 +338,10 @@ def build_minion(team):
     belt = box("MinionBelt", (0, 0, 0.79), (0.40, 0.20, 0.09), mats["gold"], bevel=0.025)
     for obj, bone in ((torso, "torso"), (helmet, "head"), (face, "head"), (visor, "head"), (crest, "head"), (belt, "hips")):
         parent_to_bone(obj, rig, bone)
+    # Glowing eyes under the visor keep the team colour readable from above.
+    for side in (-1, 1):
+        eye = ico(f"MinionEye.{side}", (0.085 * side, -0.31, 1.655), (0.045, 0.02, 0.03), mats["glow"], 1)
+        parent_to_bone(eye, rig, "head")
     add_human_limbs(rig, mats, slender=False)
     shield = ico("MinionShield", (-0.47, -0.21, 0.91), (0.34, 0.10, 0.43), mats["primary"], 1)
     shield_gem = diamond("MinionShieldGem", (-0.47, -0.32, 0.91), (0.12, 0.03, 0.16), mats["glow"])
@@ -289,6 +349,7 @@ def build_minion(team):
     hilt = box("MinionSwordHilt", (0.47, -0.04, 0.80), (0.22, 0.07, 0.06), mats["gold"], bevel=0.02)
     for obj in (shield, shield_gem): parent_to_bone(obj, rig, "arm.L")
     for obj in (sword, hilt): parent_to_bone(obj, rig, "arm.R")
+    chibify(rig)
     add_hero_animations(rig, "Minion")
     # Minions keep the shared locomotion/combat clips; Q/R are intentionally
     # removed so the runtime contract cannot mistake them for heroes.

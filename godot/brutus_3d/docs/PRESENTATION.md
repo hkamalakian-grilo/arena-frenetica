@@ -7,8 +7,11 @@ parecia um tabuleiro; a arte pintada da Travessia funciona bem de perto.
 
 ## Câmera (`main.tscn`, `scripts/main.gd`)
 
-- Ortográfica, `size = 14` (era 37), inclinação de 60° (era 75°), posição
-  `(0, 26, 15)` no rig. A 60° vemos rosto e armadura, não só o capacete.
+- Ortográfica, `size = 14` (era 37), inclinação de 55° (era 75°), posição
+  `(0, 26, 18.2)` no rig. A 55° vemos rosto e armadura, não só o capacete.
+- **Mapa inteiro sob demanda:** tocar no minimapa (ou Tab) afasta a câmera
+  até a Travessia completa (size 37, 75°) com transição de 0,38 s, e volta
+  do mesmo jeito. A partida continua rodando.
 - Segue o Brutus com suavização (`CAMERA_FOLLOW_SPEED = 6`) e um pequeno
   adiantamento na direção em que ele olha (`CAMERA_LEAD = 0.9`).
 - Limites do rig: `x ∈ [-5, 5]`, `z ∈ [-8.8, 8.8]`. Nunca aparece o vazio
@@ -28,6 +31,42 @@ extrudando a malha pelas normais com `cull_front`. Funciona no
 
 Aplicado a: Brutus (0,06 em unidades do modelo, escala 0,56), escudo
 arremessado, Lyra/Nix/Sol (0,03), minions (0,035), dragão e ovo (0,04).
+
+## Proporções de desenho animado (`tools/chibi_warp.py`)
+
+Os modelos continuam gerados por script no Blender 5.2, mas agora passam
+por um warp depois de montados: um remapeamento vertical por faixas (pernas
+encurtam, tronco encolhe um pouco, cabeça cresce) mais uma escala radial que
+depende da altura, e escala extra em mãos e botas. Ossos e vértices são
+deformados juntos, então todas as animações continuam válidas.
+
+| Modelo | Pernas | Tronco | Cabeça (z / xy) | Mãos | Botas |
+|---|---|---|---|---|---|
+| Lyra, Nix, Sol, minions | ×0,62 | ×0,86 | ×1,15 / ×1,26 | ×1,55 | ×1,3 |
+| Brutus | ×0,64 | ×0,84 | ×1,18 / ×1,22 | ×1,4 | ×1,3 |
+
+Lyra e Sol ganharam olhos grandes (esclera, pupila, brilho), sobrancelhas
+com expressão e boca; Nix, dois olhos brilhantes estreitos; minions, olhos
+luminosos na cor do time sob a viseira. As animações do elenco têm
+squash-and-stretch na raiz (corrida, ataque, dano, habilidades).
+
+O elmo do Brutus passou a laranja com aro dourado e as ombreiras a laranja
+escuro, para cabeça, ombros e escudo não virarem uma mancha única de cima.
+
+Para regerar:
+
+```text
+blender --background --factory-startup --python tools/build_roster_family.py
+blender --background --factory-startup --python tools/build_brutus.py
+godot --headless --path . --import
+```
+
+## Luz e shader dos personagens
+
+Luz principal a 40° de elevação (era 55°): vista de cima, uma luz quase
+vertical iluminava tudo por igual. O shader cel (`ToonStyle.CEL_SHADER`)
+usa 3 tons com piso de sombra 0,45, e um degradê vertical (pés a 62% do
+brilho, cabeça a 100%) que dá volume mesmo na câmera inclinada.
 
 ## Minimapa (`scripts/minimap.gd`)
 
