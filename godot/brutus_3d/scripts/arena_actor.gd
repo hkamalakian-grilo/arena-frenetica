@@ -109,6 +109,7 @@ func take_damage(amount: float, source_team: int = -1) -> void:
 		collision_layer = 0
 		collision_mask = 0
 		defeated.emit(self)
+		_death_vfx()
 		if actor_kind == &"dragon":
 			if health_fill != null:
 				health_fill.visible = false
@@ -187,6 +188,27 @@ func _set_stun_marker(visible_now: bool) -> void:
 		stun_marker.position.y = 1.55 if actor_kind == &"minion" else 3.2
 		add_child(stun_marker)
 	stun_marker.visible = visible_now
+
+
+func _death_vfx() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	match actor_kind:
+		&"minion":
+			Vfx.burst(parent, global_position + Vector3(0, 0.7, 0), _team_health_color(), 14, 2.6, 0.16, 0.45)
+			Vfx.dust(parent, global_position, 8, 0.3, 1.0)
+		&"tower", &"base":
+			var height := 2.2 if actor_kind == &"tower" else 3.0
+			Vfx.dust(parent, global_position, 40, 0.9, 3.5)
+			Vfx.burst(parent, global_position + Vector3(0, height * 0.5, 0),
+				Color(0.55, 0.5, 0.45), 30, 5.0, 0.3, 0.9, false, -9.0)
+			Vfx.burst(parent, global_position + Vector3(0, height * 0.6, 0),
+				_team_health_color(), 40, 6.0, 0.2, 0.7)
+			Vfx.flash(parent, global_position + Vector3(0, height * 0.5, 0), Color(1, 0.95, 0.8, 0.95), 4.0, 0.3)
+		&"dragon":
+			Vfx.burst(parent, global_position + Vector3(0, 1.2, 0), Color(0.8, 0.5, 1.0), 50, 5.5, 0.22, 0.9)
+			Vfx.flash(parent, global_position + Vector3(0, 1.2, 0), Color(0.9, 0.7, 1.0, 0.95), 4.0, 0.35)
 
 
 func set_protected(value: bool) -> void:
@@ -345,6 +367,8 @@ func _launch_tower_projectile(target: Node3D) -> void:
 	projectile.material_override = material
 	get_parent().add_child(projectile)
 	projectile.global_position = global_position + Vector3(0, 2.45, 0)
+	Vfx.trail(projectile, Color(color, 0.85), 0.16, 20)
+	Vfx.flash(get_parent(), projectile.global_position, Color(color, 0.9), 0.9, 0.14)
 	var target_position := target.global_position + Vector3(0, 0.75, 0)
 	var tween := projectile.create_tween()
 	tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
@@ -352,6 +376,7 @@ func _launch_tower_projectile(target: Node3D) -> void:
 	await tween.finished
 	if _valid_target(target):
 		target.call("take_damage", attack_damage, team)
+		Vfx.burst(get_parent(), target_position, color, 12, 2.8, 0.14, 0.35)
 	if is_instance_valid(projectile):
 		projectile.queue_free()
 
@@ -545,6 +570,10 @@ func play_hatch() -> void:
 func play_spawn() -> void:
 	if actor_kind == &"dragon":
 		_play_creature_animation(&"roar", 0.06, 2.0)
+		if get_parent() != null:
+			Vfx.burst(get_parent(), global_position + Vector3(0, 1.0, 0), Color(0.75, 0.45, 1.0), 40, 5.0, 0.2, 0.9)
+			Vfx.dust(get_parent(), global_position, 24, 0.6, 2.5)
+			Vfx.flash(get_parent(), global_position + Vector3(0, 1.2, 0), Color(0.85, 0.6, 1.0, 0.95), 3.5, 0.35)
 
 
 func _finish_dragon_death() -> void:

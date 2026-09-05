@@ -228,6 +228,10 @@ func _on_ability_impact(kind: StringName, world_position: Vector3) -> void:
 		var node := target as Node3D
 		if node == null:
 			continue
+		var hit_point := node.global_position + Vector3(0, 0.8, 0)
+		Vfx.burst(self, hit_point, Color(1.0, 0.85, 0.4), 12 if kind == &"attack" else 20,
+			2.5 if kind == &"attack" else 4.0, 0.14, 0.35)
+		Vfx.flash(self, hit_point, Color(1.0, 0.95, 0.75, 0.95), 0.8 if kind == &"attack" else 1.4, 0.14)
 		if kind == &"q" and node.has_method("apply_stun"):
 			node.call("apply_stun", 0.8)
 			feedback.spawn_text(node.global_position + Vector3(0, 0.6, 0), "ATORDOADO",
@@ -540,6 +544,8 @@ func _on_hero_bot_defeated(hero: HeroBot, killer_team: int) -> void:
 	if killer_team >= 0 and killer_team <= 1:
 		team_kills[killer_team] += 1
 	if killer_team == 0 and hero.team == 1:
+		Vfx.burst(self, hero.global_position + Vector3(0, 1.2, 0), Color(1.0, 0.85, 0.3), 36, 4.5, 0.2, 0.8)
+		Vfx.flash(self, hero.global_position + Vector3(0, 1.0, 0), Color(1.0, 0.92, 0.6, 0.95), 2.4, 0.28)
 		sfx.play(&"kill", 1.0, 0.02)
 		feedback.spawn_text(hero.global_position + Vector3(0, 0.8, 0), "ABATE!",
 			Color(1.0, 0.82, 0.2))
@@ -659,10 +665,13 @@ func _build_match_hud() -> void:
 	title_label.visible = false
 	hint_label.visible = false
 	speed_label.visible = false
-	for pair in [[attack_button, "ATQ"], [q_button, "Q"], [r_button, "R"]]:
+	for pair in [[attack_button, "", "res://assets/ui/skill_attack.png", Color(1.0, 0.78, 0.3)],
+			[q_button, "", "res://assets/ui/skill_q.png", Color(1.0, 0.55, 0.18)],
+			[r_button, "", "res://assets/ui/skill_r.png", Color(0.82, 0.55, 1.0)]]:
 		var button := pair[0] as AbilityButton
 		button.text = pair[1]
 		button.ready_text = pair[1]
+		HudStyle.ability_button(button, pair[3], load(pair[2]) as Texture2D)
 	var prototype_label := $HUD.get_node_or_null("Prototype") as Label
 	if prototype_label != null:
 		prototype_label.visible = false
@@ -675,8 +684,17 @@ func _build_match_hud() -> void:
 	match_label.offset_top = 44.0
 	match_label.offset_bottom = 70.0
 	match_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	match_label.add_theme_font_size_override("font_size", 16)
-	match_label.add_theme_color_override("font_color", Color("eef6e9"))
+	HudStyle.outline_label(match_label, 17, Color("f4f8ef"))
+	var top_plate := PanelContainer.new()
+	top_plate.name = "TopPlate"
+	top_plate.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	top_plate.offset_left = -232.0
+	top_plate.offset_top = 40.0
+	top_plate.offset_right = 232.0
+	top_plate.offset_bottom = 94.0
+	top_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top_plate.add_theme_stylebox_override("panel", HudStyle.plate(16))
+	$HUD.add_child(top_plate)
 	$HUD.add_child(match_label)
 
 	advantage_label = Label.new()
@@ -685,8 +703,7 @@ func _build_match_hud() -> void:
 	advantage_label.offset_top = 70.0
 	advantage_label.offset_bottom = 92.0
 	advantage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	advantage_label.add_theme_font_size_override("font_size", 13)
-	advantage_label.add_theme_color_override("font_color", Color("cfe3cc"))
+	HudStyle.outline_label(advantage_label, 13, Color("cfe3cc"), 4)
 	$HUD.add_child(advantage_label)
 
 	aim_indicator = AimIndicator.new()
@@ -712,8 +729,7 @@ func _build_match_hud() -> void:
 	status_label.offset_right = 260.0
 	status_label.offset_bottom = 138.0
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.add_theme_font_size_override("font_size", 20)
-	status_label.add_theme_color_override("font_color", Color("ffd45a"))
+	HudStyle.outline_label(status_label, 22, Color("ffd45a"), 6)
 	$HUD.add_child(status_label)
 
 	health_bar = ProgressBar.new()
@@ -724,20 +740,7 @@ func _build_match_hud() -> void:
 	health_bar.offset_right = -220.0
 	health_bar.offset_bottom = 38.0
 	health_bar.show_percentage = false
-	var health_background := StyleBoxFlat.new()
-	health_background.bg_color = Color(0.025, 0.045, 0.035, 0.92)
-	health_background.corner_radius_top_left = 10
-	health_background.corner_radius_top_right = 10
-	health_background.corner_radius_bottom_left = 10
-	health_background.corner_radius_bottom_right = 10
-	var health_fill_style := StyleBoxFlat.new()
-	health_fill_style.bg_color = Color("38cfff")
-	health_fill_style.corner_radius_top_left = 10
-	health_fill_style.corner_radius_top_right = 10
-	health_fill_style.corner_radius_bottom_left = 10
-	health_fill_style.corner_radius_bottom_right = 10
-	health_bar.add_theme_stylebox_override("background", health_background)
-	health_bar.add_theme_stylebox_override("fill", health_fill_style)
+	HudStyle.health_bar(health_bar, Color("38cfff"))
 	$HUD.add_child(health_bar)
 
 	health_text = Label.new()
@@ -750,8 +753,7 @@ func _build_match_hud() -> void:
 	health_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	health_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	health_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	health_text.add_theme_font_size_override("font_size", 13)
-	health_text.add_theme_color_override("font_color", Color.WHITE)
+	HudStyle.outline_label(health_text, 13, Color.WHITE, 4)
 	$HUD.add_child(health_text)
 
 	_build_end_overlay()
@@ -789,12 +791,11 @@ func _build_end_overlay() -> void:
 	panel.add_child(content)
 	end_title = Label.new()
 	end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	end_title.add_theme_font_size_override("font_size", 42)
+	HudStyle.outline_label(end_title, 44, Color.WHITE, 7)
 	content.add_child(end_title)
 	end_summary = Label.new()
 	end_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	end_summary.add_theme_font_size_override("font_size", 18)
-	end_summary.add_theme_color_override("font_color", Color("eaf4e7"))
+	HudStyle.outline_label(end_summary, 18, Color("eaf4e7"), 4)
 	content.add_child(end_summary)
 	var restart_button := Button.new()
 	restart_button.text = "JOGAR NOVAMENTE"

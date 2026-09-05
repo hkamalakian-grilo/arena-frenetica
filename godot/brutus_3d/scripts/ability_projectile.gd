@@ -60,6 +60,7 @@ func _build_visual() -> void:
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mesh_instance.material_override = material
 	add_child(mesh_instance)
+	Vfx.trail(self, Color(color, 0.85), hit_radius * 0.9, 18)
 	_face_direction()
 
 
@@ -81,7 +82,6 @@ func _physics_process(delta: float) -> void:
 	var step := speed * delta
 	global_position += direction * step
 	travelled += step
-	_spawn_trail(delta)
 	if homing_target != null:
 		if CombatWorld.planar(self, homing_target) <= hit_radius + 0.35:
 			_apply(homing_target)
@@ -113,15 +113,19 @@ func _physics_process(delta: float) -> void:
 
 func _apply(target: Node3D) -> void:
 	var target_team := int(target.call("get_team"))
+	var hit_point := target.global_position + Vector3(0, 0.9, 0)
 	if target_team == team:
 		if heal > 0.0 and target.has_method("heal"):
 			target.call("heal", heal)
 			CombatWorld.report_damage(get_tree(), target.global_position, heal,
 				Color(0.55, 1.0, 0.6))
+			Vfx.burst(get_parent(), hit_point, Color(0.6, 1.0, 0.65), 14, 1.6, 0.14, 0.6, true, 1.5)
 	elif damage > 0.0:
 		target.call("take_damage", damage, team)
 		CombatWorld.report_damage(get_tree(), target.global_position, damage,
 			Color(1.0, 0.86, 0.45) if team == 0 else Color(1.0, 0.55, 0.5))
+		Vfx.burst(get_parent(), hit_point, color, 10, 2.4, 0.12, 0.3)
+		Vfx.flash(get_parent(), hit_point, Color(color, 0.9), 0.7, 0.14)
 	if on_hit.is_valid():
 		on_hit.call(target)
 

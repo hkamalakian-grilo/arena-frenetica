@@ -128,6 +128,10 @@ func take_damage(amount: float, source_team: int = -1) -> void:
 		health_backdrop.visible = false
 		collision.set_deferred("disabled", true)
 		_set_stun_marker(false)
+		if get_parent() != null:
+			Vfx.burst(get_parent(), global_position + Vector3(0, 1.0, 0),
+				CombatWorld.team_color(team), 24, 3.5, 0.18, 0.6)
+			Vfx.dust(get_parent(), global_position, 12, 0.4, 1.4)
 		defeated.emit(self, last_damage_team)
 		_finish_death_visual()
 

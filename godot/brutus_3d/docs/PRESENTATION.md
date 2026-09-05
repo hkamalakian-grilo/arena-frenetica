@@ -45,6 +45,31 @@ sombra dele aparecia serrilhada sobre o relevo. `BrutusController` só guarda
 `aim_preview_kind` e `aim_preview_direction`; `aim_preview_extent(kind)` dá
 comprimento e largura em unidades de mundo.
 
+## Efeitos (`scripts/vfx.gd`)
+
+Tudo procedural, sem texturas, em `GPUParticles3D` (suportado no
+`gl_compatibility`): `burst` (faíscas aditivas ou fumaça), `dust` (poeira no
+chão), `flash` (clarão que estoura e some), `slash` (meia-lua do golpe
+corpo a corpo, shader), `trail` (emissor preso a projéteis e ao escudo) e
+`area` (chuva de flechas descendo ou brilho de cura subindo nas zonas).
+
+Onde aparecem: golpe básico (meia-lua + faíscas no acerto), Investida
+(poeira no rastro, explosão no fim), Escudo (clarão ao soltar, rastro roxo,
+explosão no impacto), passos na corrida, projéteis dos bots (rastro e clarão
+no acerto), cura (faíscas verdes), zonas, tiro de torre, morte de minion,
+herói, torre e dragão, nascimento do dragão e abate.
+
+## Interface (`scripts/hud_style.gd`)
+
+- Rótulos com contorno grosso (`outline_label`), placa escura com aro dourado
+  atrás do placar (`plate`), barra de vida com borda e brilho no topo.
+- Botões de habilidade circulares com aro na cor da habilidade, sombra e os
+  ícones pintados do projeto (`assets/ui/skill_attack.png`, `skill_q.png`,
+  `skill_r.png`). O ícone escurece durante a recarga e o tempo restante é
+  desenhado por cima com contorno.
+- Joystick com sombra, aro dourado, marcas de direção e brilho no botão.
+- Números de dano "estouram" (escala 1,6 → 1,0) ao aparecer.
+
 ## Ajustes que acompanharam a câmera próxima
 
 - Números de dano: `pixel_size` 0,0075 → 0,0042.

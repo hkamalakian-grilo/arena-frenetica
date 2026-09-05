@@ -78,9 +78,17 @@ func _gui_input(event: InputEvent) -> void:
 func _draw() -> void:
 	var c := _center()
 	var alpha := 1.0 if active else 0.45
-	draw_circle(c, radius + 13.0, Color(0.02, 0.04, 0.025, 0.66 * alpha))
-	draw_circle(c, radius, Color(0.82, 0.62, 0.2, 0.2 * alpha))
-	draw_arc(c, radius, 0.0, TAU, 64, Color(1.0, 0.78, 0.27, 0.72 * alpha), 4.0)
+	draw_circle(c + Vector2(0, 4), radius + 15.0, Color(0, 0, 0, 0.35 * alpha))
+	draw_circle(c, radius + 13.0, Color(0.03, 0.05, 0.04, 0.78 * alpha))
+	draw_circle(c, radius + 2.0, Color(0.10, 0.14, 0.10, 0.6 * alpha))
+	draw_arc(c, radius + 8.0, 0.0, TAU, 64, Color(1.0, 0.80, 0.30, 0.85 * alpha), 4.0)
+	draw_arc(c, radius * 0.45, 0.0, TAU, 40, Color(1.0, 0.85, 0.45, 0.25 * alpha), 2.0)
+	for index in range(4):
+		var angle := index * PI * 0.5
+		var tip := c + Vector2(cos(angle), sin(angle)) * (radius - 6.0)
+		draw_circle(tip, 3.0, Color(1.0, 0.85, 0.45, 0.5 * alpha))
 	var knob := c + value * radius
-	draw_circle(knob, 36.0, Color(0.95, 0.58, 0.12, 0.9 * alpha))
+	draw_circle(knob + Vector2(0, 3), 38.0, Color(0, 0, 0, 0.35 * alpha))
+	draw_circle(knob, 36.0, Color(0.95, 0.58, 0.12, 0.95 * alpha))
+	draw_circle(knob + Vector2(-8, -10), 14.0, Color(1.0, 0.85, 0.45, 0.35 * alpha))
 	draw_arc(knob, 36.0, 0.0, TAU, 40, Color(1.0, 0.9, 0.48, alpha), 4.0)

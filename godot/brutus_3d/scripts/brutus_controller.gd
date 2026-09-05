@@ -71,6 +71,7 @@ var aim_preview_kind: StringName = &""
 var aim_preview_direction := Vector3(0, 0, -1)
 var q_contact_done := false
 var q_contact_radius := 1.15
+var run_dust_distance := 0.0
 
 
 func _enemy_within(radius: float) -> bool:
@@ -517,7 +518,8 @@ func _process_attack(delta: float) -> void:
 	if action_elapsed >= 0.30 and not attack_has_impacted:
 		attack_has_impacted = true
 		var impact_position := global_position + attack_direction * 0.82 + Vector3(0, 0.10, 0)
-		_spawn_ring(impact_position, Color(1.0, 0.72, 0.18, 0.78), 0.24, 0.78, 0.20, 0.0)
+		Vfx.slash(get_parent(), global_position + attack_direction * 0.55, attack_direction,
+			Color(1.0, 0.78, 0.35))
 		ability_impact.emit(&"attack", impact_position)
 	if attack_has_impacted and not attack_queued and action_elapsed >= 0.34 and _movement_vector().length() > 0.08:
 		action_state = &""
@@ -539,14 +541,18 @@ func _process_charge(delta: float) -> void:
 		q_trail_timer -= delta
 		if q_trail_timer <= 0.0:
 			q_trail_timer = 0.075
-			_spawn_ring(global_position + Vector3(0, 0.08, 0), Color(1.0, 0.48, 0.08, 0.48),
-				0.30, 0.72, 0.32, 0.0)
+			Vfx.dust(get_parent(), global_position - q_direction * 0.3, 6, 0.34, 1.6)
+			Vfx.burst(get_parent(), global_position + Vector3(0, 0.9, 0), Color(1.0, 0.55, 0.15, 0.9),
+				4, 1.2, 0.14, 0.25, true, 0.0, -q_direction, 40.0)
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, braking * 1.4 * delta)
 		velocity.z = move_toward(velocity.z, 0.0, braking * 1.4 * delta)
 	if action_elapsed >= 0.70 and action_elapsed - delta < 0.70:
 		_spawn_ring(global_position + Vector3(0, 0.10, 0), Color(1.0, 0.72, 0.18, 0.82),
 			0.45, 1.35, 0.34, 0.0)
+		Vfx.dust(get_parent(), global_position, 14, 0.42, 2.4)
+		Vfx.burst(get_parent(), global_position + Vector3(0, 0.6, 0), Color(1.0, 0.7, 0.25),
+			18, 3.5, 0.15, 0.45)
 		ability_impact.emit(&"q", global_position)
 
 
@@ -582,6 +588,12 @@ func _face_direction(direction: Vector3, delta: float) -> void:
 func _update_speed_ratio() -> void:
 	var planar_speed := Vector2(velocity.x, velocity.z).length()
 	speed_ratio = clamp(planar_speed / move_speed, 0.0, 1.0)
+	# Small dust puffs under a running stride.
+	if action_state.is_empty() and speed_ratio > 0.6 and movement_input_strength >= 0.72:
+		run_dust_distance += planar_speed * get_physics_process_delta_time()
+		if run_dust_distance >= 0.85:
+			run_dust_distance = 0.0
+			Vfx.dust(get_parent(), global_position - last_direction * 0.25, 4, 0.22, 0.8)
 
 
 func _update_locomotion_animation() -> void:
@@ -644,6 +656,8 @@ func _launch_shield() -> void:
 	shield_projectile.name = "ThrownShield"
 	ToonStyle.apply(shield_projectile, 0.05)
 	get_parent().add_child(shield_projectile)
+	Vfx.trail(shield_projectile, Color(0.85, 0.55, 1.0, 0.9), 0.18, 30)
+	Vfx.flash(get_parent(), global_position + Vector3(0, 1.4, 0), Color(0.85, 0.6, 1.0, 0.9), 0.9, 0.16)
 	shield_projectile_direction = last_direction.normalized()
 	var left_offset := Vector3(-shield_projectile_direction.z, 0.0, shield_projectile_direction.x) * 0.72
 	shield_projectile_start = global_position + Vector3(0, 1.55, 0) + left_offset
@@ -671,7 +685,9 @@ func _update_shield_projectile(delta: float) -> void:
 		if not shield_projectile_reached_end:
 			shield_projectile_reached_end = true
 			_spawn_ring(shield_projectile_target - Vector3(0, 1.43, 0),
-				Color(1.0, 0.62, 0.10, 0.82), 0.30, 1.25, 0.34, 0.0)
+				Color(0.85, 0.55, 1.0, 0.82), 0.30, 1.25, 0.34, 0.0)
+			Vfx.burst(get_parent(), shield_projectile_target, Color(0.9, 0.65, 1.0), 22, 4.0, 0.16, 0.5)
+			Vfx.flash(get_parent(), shield_projectile_target, Color(1.0, 0.85, 1.0, 0.95), 1.6, 0.2)
 			ability_impact.emit(&"ultimate", shield_projectile_target)
 		var return_t := clampf((shield_projectile_age - outbound_duration) / return_duration, 0.0, 1.0)
 		var left_offset := Vector3(-last_direction.z, 0.0, last_direction.x) * 0.72
@@ -689,7 +705,7 @@ func _update_shield_projectile(delta: float) -> void:
 	if shield_trail_timer <= 0.0:
 		shield_trail_timer = 0.07
 		_spawn_ring(shield_projectile.global_position - Vector3(0, 1.45, 0),
-			Color(1.0, 0.48, 0.08, 0.34), 0.16, 0.42, 0.22, 0.0)
+			Color(0.8, 0.5, 1.0, 0.30), 0.16, 0.42, 0.22, 0.0)
 
 
 func _spawn_ring(world_position: Vector3, color: Color, start_scale: float,

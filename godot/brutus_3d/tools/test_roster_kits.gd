@@ -321,7 +321,9 @@ func _run() -> void:
 	q_button.call("_release", Vector2(55, 50))
 	assert(cancelled[0] == 1, "Dragging back onto the button must cancel")
 	q_button.set_cooldown(3.5, 7.0)
-	assert(q_button.cooldown_ratio < 1.0 and q_button.text.contains("3.5"), "Cooldown fill and text")
+	assert(q_button.cooldown_ratio < 1.0 and is_equal_approx(q_button.cooldown_left, 3.5),
+		"Cooldown fill and remaining time")
+	assert(q_button.icon_texture != null, "Ability buttons must show the painted skill icons")
 	brutus.q_cooldown_left = 0.0
 	brutus.action_state = &""
 	brutus.request_q(Vector3(1, 0, 0))

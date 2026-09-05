@@ -28,6 +28,8 @@ var held := false
 var repeat_timer := 0.0
 var overlay: Control
 var ready_text := ""
+var icon_texture: Texture2D
+var rim_color := Color(1.0, 0.8, 0.3)
 
 
 func _ready() -> void:
@@ -56,7 +58,11 @@ func set_cooldown(left: float, total: float) -> void:
 	if not is_equal_approx(next_ratio, cooldown_ratio):
 		cooldown_ratio = next_ratio
 		overlay.queue_redraw()
-	text = ("%s\n%.1f" % [ready_text.left(1), left]) if left > 0.0 else ready_text
+	if icon_texture == null:
+		text = ("%s\n%.1f" % [ready_text.left(1), left]) if left > 0.0 else ready_text
+	else:
+		text = ""
+		overlay.queue_redraw()
 
 
 func is_aiming() -> bool:
@@ -150,6 +156,11 @@ class AbilityOverlay:
 		var center := size * 0.5
 		var radius := minf(size.x, size.y) * 0.5
 		var ratio := owner_button.cooldown_ratio
+		if owner_button.icon_texture != null:
+			var inset := radius * 0.16
+			var icon_rect := Rect2(Vector2(inset, inset), size - Vector2(inset, inset) * 2.0)
+			var dim := 1.0 if (ratio >= 1.0 and not owner_button.disabled) else 0.45
+			draw_texture_rect(owner_button.icon_texture, icon_rect, false, Color(dim, dim, dim, 1.0))
 		if ratio < 1.0:
 			# Dark wedge for the remaining cooldown, sweeping clockwise from 12h.
 			var start := -PI * 0.5
@@ -161,6 +172,15 @@ class AbilityOverlay:
 				points.append(center + Vector2(cos(angle), sin(angle)) * (radius - 3.0))
 			draw_colored_polygon(points, Color(0.02, 0.03, 0.02, 0.62))
 			draw_arc(center, radius - 3.0, start, end, 40, Color(1.0, 0.85, 0.4, 0.9), 3.0)
+			if owner_button.icon_texture != null and owner_button.cooldown_left > 0.0:
+				var font := get_theme_default_font()
+				var label := "%.1f" % owner_button.cooldown_left
+				var text_size := 26
+				var width := font.get_string_size(label, HORIZONTAL_ALIGNMENT_CENTER, -1, text_size).x
+				var at := Vector2(center.x - width * 0.5, center.y + text_size * 0.38)
+				draw_string_outline(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size, 6,
+					Color(0.02, 0.03, 0.03, 0.95))
+				draw_string(font, at, label, HORIZONTAL_ALIGNMENT_LEFT, -1, text_size, Color.WHITE)
 		if owner_button.aiming:
 			var stick_end := owner_button._stick_end()
 			draw_line(center, stick_end, Color(1.0, 0.92, 0.6, 0.85), 5.0)

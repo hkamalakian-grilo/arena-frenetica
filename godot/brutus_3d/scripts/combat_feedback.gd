@@ -87,8 +87,10 @@ func spawn_damage_number(world_position: Vector3, amount: float, color: Color,
 	world.add_child(label)
 	var jitter := Vector3(randf_range(-0.25, 0.25), 0.0, randf_range(-0.15, 0.15))
 	label.global_position = world_position + Vector3(0, 1.9, 0) + jitter
+	label.scale = Vector3.ONE * 1.6
 	var tween := label.create_tween()
 	tween.set_parallel(true)
+	tween.tween_property(label, "scale", Vector3.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(label, "global_position", label.global_position + Vector3(0, 1.25, 0), 0.62) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(label, "modulate:a", 0.0, 0.32).set_delay(0.30)

@@ -71,6 +71,7 @@ func _build_visual() -> void:
 	ring.material_override = ring_material
 	ring.position.y = 0.07
 	add_child(ring)
+	Vfx.area(self, radius * 0.9, Color(color, 0.9), damage_per_tick > 0.0)
 
 
 func _process(delta: float) -> void:
