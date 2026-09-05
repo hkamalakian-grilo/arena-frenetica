@@ -34,6 +34,17 @@ const WALKABLE_RECTS := [
 		"half_extents": Vector2(1.55, 3.80)},
 	{"name": &"south_center_path", "center": Vector2(0.0, 7.10),
 		"half_extents": Vector2(1.55, 3.80)},
+	# Broad junctions follow the painted stone openings between each base and
+	# its three roads. They prevent an apparently open diagonal from behaving
+	# like an invisible wall while keeping the jungle interiors blocked.
+	{"name": &"north_left_junction", "center": Vector2(-3.30, -10.95),
+		"half_extents": Vector2(2.15, 2.0)},
+	{"name": &"north_right_junction", "center": Vector2(3.30, -10.95),
+		"half_extents": Vector2(2.15, 2.0)},
+	{"name": &"south_left_junction", "center": Vector2(-3.30, 10.95),
+		"half_extents": Vector2(2.15, 2.0)},
+	{"name": &"south_right_junction", "center": Vector2(3.30, 10.95),
+		"half_extents": Vector2(2.15, 2.0)},
 ]
 
 ## The painted base walls are curved. Ellipses prevent the rectangular corner
@@ -187,13 +198,16 @@ static func _point_in_walkable_ellipse(point: Vector2, zone: Dictionary,
 
 static func match_rules() -> Dictionary:
 	return {
-		# Canonical Alpha pace: every time-based system runs at half speed.
+		# Moment-to-moment presentation remains deliberately cadenced. Match
+		# clock, waves, cooldowns and respawns explicitly use real time.
 		"game_speed": 0.50,
 		"match_duration": 180.0,
 		"dragon_hatch_remaining": 60.0,
-		"wave_interval": 8.0,
-		"max_actors": 42,
+		"wave_interval": 10.0,
+		"max_actors": 38,
+		"max_minions_per_lane": 4,
 		"respawn_time": 3.0,
+		"dragon_team_damage_bonus": 1.12,
 	}
 
 
@@ -248,7 +262,7 @@ static func structures() -> Array[Dictionary]:
 			"kind": &"base",
 			"team": marker.team,
 			"position": marker.position,
-			"health": 3200.0,
+			"health": 4200.0,
 			"color": Color("2aa8d8") if marker.team == 0 else Color("d8455d"),
 		})
 	for marker in tower_markers():
@@ -257,7 +271,7 @@ static func structures() -> Array[Dictionary]:
 			"kind": &"tower",
 			"team": marker.team,
 			"position": marker.position,
-			"health": 1250.0,
+			"health": 1500.0,
 			"color": Color("37bfe8") if marker.team == 0 else Color("ef5268"),
 		})
 	return result
@@ -341,11 +355,11 @@ static func minion(team: int, lane_x: float) -> Dictionary:
 		"kind": &"minion",
 		"team": team,
 		"position": Vector3(lane_x, 0, 12.8 if team == 0 else -12.8),
-		"health": 280.0,
+		"health": 240.0,
 		"move_speed": 1.15,
-		"attack_damage": 38.0,
+		"attack_damage": 26.0,
 		"attack_range": 1.25,
-		"attack_interval": 1.0,
+		"attack_interval": 1.10,
 		"lane_x": lane_x,
 		"color": Color("58c9ef") if team == 0 else Color("ef6073"),
 	}

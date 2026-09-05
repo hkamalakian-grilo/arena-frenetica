@@ -9,6 +9,7 @@ Zonas liberadas na Alpha 1:
 
 - lane esquerda e lane direita, incluindo as pontes laterais;
 - praças das duas bases;
+- quatro junções diagonais que conectam visualmente cada praça às lanes;
 - lane central contínua entre cada base e os portões do rio;
 - corredor lateral aberto entre a lane esquerda e o acampamento superior
   esquerdo;
@@ -55,5 +56,6 @@ mesmo evento que monta as pontes.
 
 ## Teste
 
-`tools/test_walkable_physics.gd` cobre lane, água, jungle, limites externos,
-deslizamento, recuperação, investida, bots e abertura dinâmica do dragão.
+`tools/test_walkable_physics.gd` cobre lanes, junções diagonais das bases, água,
+jungle, limites externos, deslizamento, recuperação, investida, bots e abertura
+dinâmica do dragão.

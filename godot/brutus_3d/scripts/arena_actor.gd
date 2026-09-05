@@ -5,6 +5,8 @@ signal health_changed(current: float, maximum: float)
 signal defeated(actor: ArenaActor)
 
 const MINION_UNIT_AGGRO_RANGE := 4.5
+const DRAGON_3D_SCENE := preload("res://assets/dragon/dragon_3d.glb")
+const DRAGON_EGG_3D_SCENE := preload("res://assets/dragon/dragon_egg_3d.glb")
 
 var actor_kind: StringName = &"minion"
 var team := 0
@@ -17,6 +19,7 @@ var attack_interval := 1.0
 var lane_x := 0.0
 var is_defeated := false
 var is_protected := false
+var last_damage_team := -1
 var attack_timer := 0.0
 var objective: Node3D
 
@@ -25,6 +28,9 @@ var health_backdrop: MeshInstance3D
 var actor_art: Sprite3D
 var actor_model: StylizedActor3D
 var egg_root: Node3D
+var creature_model: Node3D
+var creature_animation: AnimationPlayer
+var protection_ring: MeshInstance3D
 var egg_time := 0.0
 var body_color := Color.WHITE
 
@@ -58,26 +64,49 @@ func is_targetable() -> bool:
 	return not is_defeated and actor_kind != &"dragon_egg"
 
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, source_team: int = -1) -> void:
 	if is_defeated or is_protected or actor_kind == &"dragon_egg" or amount <= 0.0:
 		return
+	last_damage_team = source_team
 	health = maxf(0.0, health - amount)
-	if actor_model != null:
-		actor_model.trigger_hurt()
+	if health > 0.0:
+		if actor_model != null:
+			actor_model.trigger_hurt()
+		elif actor_kind == &"dragon":
+			_play_creature_animation(&"hurt")
 	_flash_damage()
 	_update_health_bar()
 	health_changed.emit(health, max_health)
 	if health <= 0.0:
 		is_defeated = true
 		velocity = Vector3.ZERO
+		collision_layer = 0
+		collision_mask = 0
 		defeated.emit(self)
-		queue_free()
+		if actor_kind == &"dragon":
+			if health_fill != null:
+				health_fill.visible = false
+			if health_backdrop != null:
+				health_backdrop.visible = false
+			_play_creature_animation(&"death", 0.06, 2.0)
+			_finish_dragon_death()
+		elif actor_kind == &"minion" and actor_model != null:
+			if health_fill != null:
+				health_fill.visible = false
+			if health_backdrop != null:
+				health_backdrop.visible = false
+			actor_model.trigger_death()
+			_finish_minion_death()
+		else:
+			queue_free()
 
 
 func set_protected(value: bool) -> void:
 	is_protected = value
 	if actor_art != null:
 		actor_art.modulate = Color(0.72, 0.78, 0.86, 1.0) if value else Color.WHITE
+	if protection_ring != null:
+		protection_ring.visible = value
 
 
 func get_is_protected() -> bool:
@@ -94,9 +123,6 @@ func _physics_process(delta: float) -> void:
 			clampf(velocity.length() / maxf(move_speed, 0.01), 0.0, 1.0))
 	elif actor_kind == &"tower" or actor_kind == &"dragon":
 		_process_guardian()
-	elif actor_kind == &"dragon_egg" and egg_root != null:
-		egg_time += delta
-		egg_root.rotation.z = sin(egg_time * 1.8) * 0.035
 
 
 func _process_minion() -> void:
@@ -142,10 +168,12 @@ func _try_attack(target: Node3D) -> void:
 	attack_timer = attack_interval
 	if actor_model != null:
 		actor_model.trigger_attack()
+	elif actor_kind == &"dragon":
+		_play_creature_animation(&"attack")
 	if actor_kind == &"tower":
 		_launch_tower_projectile(target)
 	else:
-		target.call("take_damage", attack_damage)
+		target.call("take_damage", attack_damage, team)
 
 
 func _launch_tower_projectile(target: Node3D) -> void:
@@ -171,7 +199,7 @@ func _launch_tower_projectile(target: Node3D) -> void:
 	tween.tween_property(projectile, "global_position", target_position, 0.28)
 	await tween.finished
 	if _valid_target(target):
-		target.call("take_damage", attack_damage)
+		target.call("take_damage", attack_damage, team)
 	if is_instance_valid(projectile):
 		projectile.queue_free()
 
@@ -275,22 +303,111 @@ func _build_visual() -> void:
 			else "res://assets/structures/main_tower_core_red_v2.png", 0.0047,
 			main_tower_art_y)
 	elif actor_kind == &"dragon":
-		_add_art_sprite("res://assets/dragon/dragon_purple_v2.png", 0.0030, 1.55)
+		_build_dragon_3d()
 	elif actor_kind == &"dragon_egg":
 		_build_dragon_egg()
 	if actor_kind != &"dragon_egg":
 		_build_health_bar()
+	if actor_kind == &"base":
+		_build_protection_ring()
+
+
+func _build_protection_ring() -> void:
+	protection_ring = MeshInstance3D.new()
+	protection_ring.name = "ProtectionRing"
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = 1.62
+	mesh.outer_radius = 1.78
+	mesh.rings = 48
+	mesh.ring_segments = 10
+	protection_ring.mesh = mesh
+	var color := Color("4ed7ff") if team == 0 else Color("ff6076")
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(color, 0.76)
+	material.emission_enabled = true
+	material.emission = color
+	material.emission_energy_multiplier = 0.65
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	protection_ring.material_override = material
+	protection_ring.position.y = 0.08
+	protection_ring.visible = false
+	add_child(protection_ring)
 
 
 func _build_dragon_egg() -> void:
 	egg_root = Node3D.new()
-	egg_root.name = "DragonEgg3D"
+	egg_root.name = "DragonEggVisual"
 	add_child(egg_root)
-	_add_ground_shadow(1.45)
-	var egg_art := _add_art_sprite(
-		"res://assets/dragon/dragon_egg_purple_v1.png", 0.00210, 1.04)
-	remove_child(egg_art)
-	egg_root.add_child(egg_art)
+	_add_ground_shadow(2.30)
+	creature_model = DRAGON_EGG_3D_SCENE.instantiate()
+	creature_model.name = "DragonEgg3D"
+	creature_model.scale = Vector3.ONE * 1.28
+	egg_root.add_child(creature_model)
+	_configure_creature_animation()
+	_play_creature_animation(&"idle")
+
+
+func _build_dragon_3d() -> void:
+	_add_ground_shadow(2.75)
+	creature_model = DRAGON_3D_SCENE.instantiate()
+	creature_model.name = "Dragon3D"
+	creature_model.scale = Vector3.ONE * 0.74
+	add_child(creature_model)
+	_configure_creature_animation()
+	_play_creature_animation(&"idle")
+
+
+func _configure_creature_animation() -> void:
+	creature_animation = creature_model.find_child(
+		"AnimationPlayer", true, false) as AnimationPlayer
+	if creature_animation == null:
+		return
+	if creature_animation.has_animation(&"idle"):
+		creature_animation.get_animation(&"idle").loop_mode = Animation.LOOP_LINEAR
+	if not creature_animation.animation_finished.is_connected(
+		_on_creature_animation_finished):
+		creature_animation.animation_finished.connect(_on_creature_animation_finished)
+
+
+func _play_creature_animation(clip_name: StringName, blend := 0.08,
+		speed_scale := 1.0) -> void:
+	if creature_animation != null and creature_animation.has_animation(clip_name):
+		creature_animation.speed_scale = speed_scale
+		creature_animation.play(clip_name, blend)
+
+
+func _on_creature_animation_finished(clip_name: StringName) -> void:
+	if clip_name != &"death" and clip_name != &"hatch" and not is_defeated:
+		_play_creature_animation(&"idle", 0.12)
+
+
+func play_hatch() -> void:
+	if actor_kind == &"dragon_egg":
+		# The match runs at 50% pace, but the event needs to finish before the
+		# dragon replaces the egg 0.86 real second later.
+		_play_creature_animation(&"hatch", 0.04, 4.0)
+
+
+func play_spawn() -> void:
+	if actor_kind == &"dragon":
+		_play_creature_animation(&"roar", 0.06, 2.0)
+
+
+func _finish_dragon_death() -> void:
+	var duration := 1.4
+	if creature_animation != null and creature_animation.has_animation(&"death"):
+		duration = creature_animation.get_animation(&"death").length
+	await get_tree().create_timer(duration, true, false, true).timeout
+	if is_instance_valid(self):
+		queue_free()
+
+
+func _finish_minion_death() -> void:
+	await get_tree().create_timer(
+		actor_model.death_duration(), true, false, true).timeout
+	if is_instance_valid(self):
+		queue_free()
 
 
 func _add_art_sprite(texture_path: String, pixel_size: float, y_position: float) -> Sprite3D:
@@ -355,14 +472,16 @@ func _build_collision() -> void:
 
 
 func _build_health_bar() -> void:
-	var width := 1.05 if actor_kind == &"minion" else 2.05
-	var height := 1.35 if actor_kind == &"minion" else 3.35
+	var width := 0.92 if actor_kind == &"minion" else 2.05
+	var height := 1.62 if actor_kind == &"minion" else 3.35
+	if actor_kind == &"minion":
+		height = 2.08
 	if actor_kind == &"base":
 		width = 2.75
 		height = 4.45
 	if actor_kind == &"dragon":
 		width = 3.0
-		height = 3.25
+		height = 3.85
 	health_backdrop = _add_billboard_bar("HealthBackdrop", Vector2(width + 0.16, 0.24),
 		Color(0.035, 0.055, 0.045, 0.94), Vector3(0, height, 0), 1)
 	health_fill = _add_billboard_bar("HealthFill", Vector2(width, 0.14),

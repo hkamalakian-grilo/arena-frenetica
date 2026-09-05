@@ -19,6 +19,10 @@ final é este projeto Godot e não precisa reproduzir as limitações visuais do
 - Q — Investida: preparação atrás do escudo, dash, rastro e impacto; cooldown de 7 s.
 - R — Escudo Bumerangue: giro de tronco, escudo destacável, voo, impacto e retorno; cooldown de 35 s.
 - Câmera MOBA ortográfica inclinada em 55°.
+- Ovo e dragão centrais totalmente 3D, autorais e animados; o evento inclui
+  pulsação, eclosão, rugido, ataque, dano e morte sem sprites billboard.
+- Elenco Alpha completo em 3D autoral: Brutus, Lyra, Nix e Sol, além de minions
+  azuis e vermelhos, todos com rig, locomoção, combate, dano e morte.
 - Controles por WASD, setas e analógico virtual.
 - Travessia em retrato com apresentação 2.5D fiel à arte aprovada: textura
   canônica sobre malha subdividida e relevo alinhado por mapa de altura.
@@ -41,6 +45,16 @@ godot --path godot/brutus_3d
 - `assets/brutus/brutus_source.blend`: fonte editável com rig e animações.
 - `tools/build_brutus.py`: reconstrói o modelo, renderiza a prévia e exporta o GLB.
 - `tools/inspect_brutus.gd`: valida o modelo e os nomes das animações no Godot.
+- `assets/dragon/dragon_egg_3d.glb` e `assets/dragon/dragon_3d.glb`: modelos 3D
+  consumidos pelo evento central.
+- `assets/dragon/*_source.blend`: fontes editáveis do ovo e do dragão.
+- `tools/build_dragon_family.py`: reconstrói ambos os modelos, previews e GLBs.
+- `tools/inspect_dragon_family.gd`: valida malhas e clips após a importação.
+- `docs/DRAGON_3D_PIPELINE.md`: contrato visual e técnico do objetivo central.
+- `assets/roster/*.glb`: Lyra, Nix, Sol e as duas variantes de minion usadas no jogo.
+- `assets/roster/*_source.blend`: fontes editáveis de todo o elenco adicional.
+- `tools/build_roster_family.py`: reconstrói modelos, previews, rigs e animações.
+- `tools/inspect_roster_family.gd`: valida malhas e contratos de clips do elenco.
 - `tools/test_abilities.gd`: executa automaticamente Investida e Escudo Bumerangue e valida seus estados.
 - `scripts/data/travessia_definition.gd`: fonte canônica das posições e regras do mapa.
 - `scripts/travessia_map.gd`: apresentação jogável alinhada à arte aprovada da Travessia.
@@ -76,12 +90,17 @@ inclui a primeira versão jogável da Travessia:
 
 - duas lanes verticais e rio central;
 - duas bases e quatro torres com vida, alcance e dano;
-- waves automáticas nas duas lanes;
-- minions que mantêm uma linha reta e focam torre antes da base;
+- waves automáticas em tempo real nas duas lanes, limitadas a quatro minions por
+  equipe em cada lane para impedir acúmulo infinito;
+- minions que mantêm uma linha reta e priorizam unidades próximas antes das estruturas;
 - dragão neutro no centro;
 - Brutus com vida, dano em área real, morte e retorno;
-- HUD de vida, tempo, vida da base inimiga e anúncios;
-- vitória ao destruir a base inimiga.
+- HUD de vida identificado, tempo real, estado das quatro torres, objetivo central
+  e anúncios;
+- torre principal protegida até as duas torres de lane caírem;
+- tela final com resultado, motivo, torres, abates e reinício;
+- vitória ao destruir a torre principal inimiga ou por vantagem no desempate.
 
-`tools/test_match.gd` valida estruturas, wave inicial, trajetória reta dos minions,
-dano do Brutus e condição de vitória.
+`tools/test_match.gd` valida estruturas, limite de waves, prioridades de IA,
+relógio real, recompensa do dragão, trajetória reta, dano, bloqueio pelas duas
+torres, condição de vitória e tela final.

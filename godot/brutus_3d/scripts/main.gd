@@ -15,8 +15,12 @@ var camera_rest_position := Vector3.ZERO
 var camera_shake_left := 0.0
 var camera_shake_strength := 0.0
 var health_bar: ProgressBar
+var health_text: Label
 var match_label: Label
 var status_label: Label
+var end_overlay: ColorRect
+var end_title: Label
+var end_summary: Label
 var match_time := 0.0
 var wave_timer := 0.0
 var match_over := false
@@ -26,6 +30,10 @@ var arena_map: TravessiaMap
 var dragon_egg: ArenaActor
 var dragon_hatched := false
 var match_rules := TravessiaDefinition.match_rules()
+var team_kills := [0, 0]
+var team_towers_destroyed := [0, 0]
+var team_damage_multiplier := {0: 1.0, 1: 1.0}
+var dragon_slain_by := -1
 @export var follow_player_camera := false
 
 func _ready() -> void:
@@ -48,6 +56,7 @@ func _ready() -> void:
 	_on_brutus_health_changed(brutus.health, brutus.max_health)
 
 func _process(delta: float) -> void:
+	var real_delta := delta / maxf(Engine.time_scale, 0.001)
 	if follow_player_camera:
 		var target := Vector3(brutus.global_position.x, 0.0, brutus.global_position.z)
 		camera_rig.global_position = camera_rig.global_position.lerp(
@@ -63,14 +72,14 @@ func _process(delta: float) -> void:
 	_update_ability_button(r_button, "R", brutus.r_cooldown_left)
 	_update_camera_shake(delta)
 	if not match_over:
-		match_time += delta
+		match_time += real_delta
 		var hatch_at := float(match_rules.match_duration) \
 			- float(match_rules.dragon_hatch_remaining)
 		if not dragon_hatched and match_time >= hatch_at:
 			_hatch_dragon()
 		if match_time >= float(match_rules.match_duration):
 			_finish_by_time()
-		wave_timer -= delta
+		wave_timer -= real_delta
 		if wave_timer <= 0.0:
 			wave_timer = float(match_rules.wave_interval)
 			_spawn_wave()
@@ -83,6 +92,9 @@ func _exit_tree() -> void:
 		Engine.time_scale = 1.0
 
 func _update_ability_button(button: Button, ready_text: String, cooldown: float) -> void:
+	if match_over:
+		button.disabled = true
+		return
 	button.disabled = cooldown > 0.0
 	button.text = "%s\n%.1f s" % [ready_text.left(1), cooldown] if cooldown > 0.0 else ready_text
 
@@ -134,13 +146,14 @@ func _spawn_hero_bots() -> void:
 		bot.position = data.position
 		add_child(bot)
 		bot.configure(data)
+		bot.defeated.connect(_on_hero_bot_defeated)
 		hero_bots.append(bot)
 
 
 func _spawn_structure(data: Dictionary) -> ArenaActor:
 	var kind: StringName = data.kind
 	var team: int = data.team
-	var damage := 92.0 if kind == &"tower" else 0.0
+	var damage := 125.0 if kind == &"tower" else 0.0
 	var attack_range := 4.5 if kind == &"tower" else 0.0
 	var actor := _spawn_actor({
 		"kind": kind,
@@ -148,7 +161,7 @@ func _spawn_structure(data: Dictionary) -> ArenaActor:
 		"health": data.health,
 		"attack_damage": damage,
 		"attack_range": attack_range,
-		"attack_interval": 1.20,
+		"attack_interval": 1.0,
 		"color": data.color,
 	}, data.position)
 	actor.name = String(data.id).to_pascal_case()
@@ -183,25 +196,46 @@ func _spawn_wave() -> void:
 	if match_over or get_tree().get_nodes_in_group("arena_actors").size() > int(match_rules.max_actors):
 		return
 	for lane_x in TravessiaDefinition.LANE_X:
-		_spawn_minion(0, lane_x)
-		_spawn_minion(1, lane_x)
+		for team in [0, 1]:
+			if _lane_minion_count(team, lane_x) \
+					< int(match_rules.max_minions_per_lane):
+				_spawn_minion(team, lane_x)
 
 
 func _spawn_minion(team: int, lane_x: float) -> void:
 	var data := TravessiaDefinition.minion(team, lane_x)
-	_spawn_actor(data, data.position)
+	var actor := _spawn_actor(data, data.position)
+	actor.attack_damage *= float(team_damage_multiplier.get(team, 1.0))
+
+
+func _lane_minion_count(team: int, lane_x: float) -> int:
+	var count := 0
+	for node in get_tree().get_nodes_in_group("arena_actors"):
+		var actor := node as ArenaActor
+		if actor != null and actor.actor_kind == &"minion" and actor.team == team \
+				and absf(actor.lane_x - lane_x) < 0.1 and not actor.is_defeated:
+			count += 1
+	return count
 
 
 func _hatch_dragon() -> void:
 	if dragon_hatched or match_over:
 		return
 	dragon_hatched = true
+	arena_map.open_dragon_access(1.35)
+	status_label.text = "O OVO ESTÁ CHOCANDO!"
+	status_label.modulate = Color("dca3ff")
+	if is_instance_valid(dragon_egg):
+		dragon_egg.play_hatch()
+		await get_tree().create_timer(0.86, true, false, true).timeout
 	if is_instance_valid(dragon_egg):
 		dragon_egg.queue_free()
+	if match_over:
+		return
 	var dragon_data := TravessiaDefinition.dragon_definition()
-	_spawn_actor(dragon_data, dragon_data.position)
-	arena_map.open_dragon_access(1.35)
-	status_label.text = "O OVO CHOCOU — DRAGAO NO CENTRO!"
+	var dragon := _spawn_actor(dragon_data, dragon_data.position)
+	dragon.play_spawn()
+	status_label.text = "O OVO CHOCOU — DRAGÃO NO CENTRO!"
 	status_label.modulate = Color("dca3ff")
 	_get_tree_timer_clear_status()
 
@@ -209,18 +243,14 @@ func _hatch_dragon() -> void:
 func _finish_by_time() -> void:
 	if match_over:
 		return
-	match_over = true
-	var allied_health := _base_health(0)
-	var enemy_health := _base_health(1)
-	if enemy_health < allied_health:
-		status_label.text = "VITORIA POR TEMPO!"
-		status_label.modulate = Color("ffd45a")
-	elif allied_health < enemy_health:
-		status_label.text = "DERROTA POR TEMPO"
-		status_label.modulate = Color("ff6477")
-	else:
-		status_label.text = "EMPATE"
-		status_label.modulate = Color.WHITE
+	var allied_score := _team_score(0)
+	var enemy_score := _team_score(1)
+	var winner := -1
+	if allied_score > enemy_score + 0.1:
+		winner = 0
+	elif enemy_score > allied_score + 0.1:
+		winner = 1
+	_finish_match(winner, "tempo")
 
 
 func _base_health(team: int) -> float:
@@ -228,6 +258,19 @@ func _base_health(team: int) -> float:
 	if is_instance_valid(reference):
 		return (reference as ArenaActor).health
 	return 0.0
+
+
+func _team_score(team: int) -> float:
+	var score := _base_health(team)
+	for node in get_tree().get_nodes_in_group("arena_actors"):
+		var actor := node as ArenaActor
+		if actor != null and actor.team == team and actor.actor_kind == &"tower" \
+				and not actor.is_defeated:
+			score += actor.health * 0.35
+	score += float(team_kills[team]) * 45.0
+	if dragon_slain_by == team:
+		score += 180.0
+	return score
 
 
 func _damage_enemies(center: Vector3, radius: float, damage: float) -> void:
@@ -245,23 +288,53 @@ func _damage_enemies(center: Vector3, radius: float, damage: float) -> void:
 			Vector2(target.global_position.x, target.global_position.z)
 		)
 		if distance <= radius:
-			target.call("take_damage", damage)
+			target.call("take_damage",
+				damage * float(team_damage_multiplier.get(0, 1.0)), 0)
 
 
 func _on_actor_defeated(actor: ArenaActor) -> void:
 	if actor.actor_kind == &"tower":
+		team_towers_destroyed[1 - actor.team] += 1
 		_refresh_base_protection()
-		status_label.text = "TORRE INIMIGA DESTRUIDA!" if actor.team == 1 else "TORRE ALIADA DESTRUIDA!"
+		status_label.text = "TORRE INIMIGA DESTRUÍDA!" if actor.team == 1 \
+			else "TORRE ALIADA DESTRUÍDA!"
 		_get_tree_timer_clear_status()
 	elif actor.actor_kind == &"dragon":
-		status_label.text = "DRAGAO DERROTADO — EQUIPE FORTALECIDA"
+		_apply_dragon_reward(actor.last_damage_team)
+	elif actor.actor_kind == &"base":
+		_finish_match(1 - actor.team, "torre principal destruída")
+
+
+func _apply_dragon_reward(team: int) -> void:
+	if team < 0 or team > 1:
+		status_label.text = "DRAGÃO DERROTADO"
+		_get_tree_timer_clear_status()
+		return
+	dragon_slain_by = team
+	var bonus := float(match_rules.dragon_team_damage_bonus)
+	team_damage_multiplier[team] = bonus
+	if team == 0 and not brutus.is_defeated:
 		brutus.health = minf(brutus.max_health, brutus.health + 420.0)
 		brutus.health_changed.emit(brutus.health, brutus.max_health)
-		_get_tree_timer_clear_status()
-	elif actor.actor_kind == &"base":
-		match_over = true
-		status_label.text = "VITORIA!" if actor.team == 1 else "DERROTA"
-		status_label.modulate = Color("ffd45a") if actor.team == 1 else Color("ff6477")
+	for hero in hero_bots:
+		if hero.team != team:
+			continue
+		hero.damage_multiplier = bonus
+		if not hero.is_defeated:
+			hero.health = minf(hero.max_health, hero.health + hero.max_health * 0.25)
+			hero.call("_update_health_bar")
+	for node in get_tree().get_nodes_in_group("arena_actors"):
+		var actor := node as ArenaActor
+		if actor != null and actor.actor_kind == &"minion" and actor.team == team:
+			actor.attack_damage *= bonus
+	var team_name := "AZUL" if team == 0 else "VERMELHA"
+	status_label.text = "DRAGÃO DERROTADO — EQUIPE %s FORTALECIDA" % team_name
+	_get_tree_timer_clear_status()
+
+
+func _on_hero_bot_defeated(_hero: HeroBot, killer_team: int) -> void:
+	if killer_team >= 0 and killer_team <= 1:
+		team_kills[killer_team] += 1
 
 
 func _refresh_base_protection() -> void:
@@ -275,9 +348,9 @@ func _refresh_base_protection() -> void:
 		var base_reference = team_bases.get(team)
 		if is_instance_valid(base_reference):
 			var team_base := base_reference as ArenaActor
-			# Travessia uses any-tower gating: the base opens after the first
-			# defensive tower falls, matching the established HTML rules.
-			team_base.set_protected(standing_towers >= 2)
+			# Both lanes matter: the main tower opens only when every defensive
+			# tower from that team has fallen.
+			team_base.set_protected(standing_towers > 0)
 
 
 func _on_brutus_health_changed(current: float, maximum: float) -> void:
@@ -286,14 +359,18 @@ func _on_brutus_health_changed(current: float, maximum: float) -> void:
 	health_bar.max_value = maximum
 	health_bar.value = current
 	health_bar.tooltip_text = "Brutus: %d / %d" % [roundi(current), roundi(maximum)]
+	if health_text != null:
+		health_text.text = "BRUTUS  %d / %d" % [roundi(current), roundi(maximum)]
 
 
 func _on_brutus_defeated() -> void:
+	if brutus.last_damage_team >= 0 and brutus.last_damage_team <= 1:
+		team_kills[brutus.last_damage_team] += 1
 	status_label.text = "BRUTUS CAIU — RETORNO EM 3 s"
 	attack_button.disabled = true
 	q_button.disabled = true
 	r_button.disabled = true
-	await get_tree().create_timer(float(match_rules.respawn_time)).timeout
+	await get_tree().create_timer(float(match_rules.respawn_time), true, false, true).timeout
 	if match_over:
 		return
 	brutus.revive(TravessiaDefinition.PLAYER_SPAWN)
@@ -307,9 +384,54 @@ func _get_tree_timer_clear_status() -> void:
 
 
 func _clear_status_later() -> void:
-	await get_tree().create_timer(2.2).timeout
+	await get_tree().create_timer(2.2, true, false, true).timeout
 	if not match_over:
 		status_label.text = ""
+
+
+func _finish_match(winner_team: int, reason: String) -> void:
+	if match_over:
+		return
+	match_over = true
+	brutus.set_virtual_input(Vector2.ZERO)
+	attack_button.disabled = true
+	q_button.disabled = true
+	r_button.disabled = true
+	joystick.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for node in get_tree().get_nodes_in_group("arena_actors"):
+		var actor := node as Node
+		if is_instance_valid(actor):
+			actor.process_mode = Node.PROCESS_MODE_DISABLED
+	brutus.process_mode = Node.PROCESS_MODE_DISABLED
+	var title := "EMPATE"
+	var color := Color.WHITE
+	if winner_team == 0:
+		title = "VITÓRIA!"
+		color = Color("ffd45a")
+	elif winner_team == 1:
+		title = "DERROTA"
+		color = Color("ff6477")
+	status_label.text = title
+	status_label.modulate = color
+	_show_end_overlay(title, reason, color)
+
+
+func _show_end_overlay(title: String, reason: String, color: Color) -> void:
+	if end_overlay == null:
+		return
+	end_title.text = title
+	end_title.add_theme_color_override("font_color", color)
+	end_summary.text = "%s\nTorres: %d × %d   Abates: %d × %d%s" % [
+		reason.capitalize(), team_towers_destroyed[0], team_towers_destroyed[1],
+		team_kills[0], team_kills[1],
+		"   Dragão: Azul" if dragon_slain_by == 0 else (
+			"   Dragão: Vermelho" if dragon_slain_by == 1 else "")]
+	end_overlay.visible = true
+
+
+func _restart_match() -> void:
+	Engine.time_scale = 1.0
+	get_tree().reload_current_scene()
 
 
 func _build_match_hud() -> void:
@@ -328,8 +450,8 @@ func _build_match_hud() -> void:
 	match_label = Label.new()
 	match_label.name = "MatchStatus"
 	match_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	match_label.offset_top = 50.0
-	match_label.offset_bottom = 78.0
+	match_label.offset_top = 46.0
+	match_label.offset_bottom = 72.0
 	match_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	match_label.add_theme_font_size_override("font_size", 16)
 	match_label.add_theme_color_override("font_color", Color("eef6e9"))
@@ -339,7 +461,7 @@ func _build_match_hud() -> void:
 	status_label.name = "Announcement"
 	status_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	status_label.offset_left = -260.0
-	status_label.offset_top = 82.0
+	status_label.offset_top = 76.0
 	status_label.offset_right = 260.0
 	status_label.offset_bottom = 118.0
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -350,13 +472,89 @@ func _build_match_hud() -> void:
 	health_bar = ProgressBar.new()
 	health_bar.name = "BrutusHealth"
 	health_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	health_bar.offset_left = 250.0
-	health_bar.offset_top = 18.0
-	health_bar.offset_right = -250.0
+	health_bar.offset_left = 220.0
+	health_bar.offset_top = 12.0
+	health_bar.offset_right = -220.0
 	health_bar.offset_bottom = 38.0
 	health_bar.show_percentage = false
-	health_bar.add_theme_color_override("font_color", Color.WHITE)
+	var health_background := StyleBoxFlat.new()
+	health_background.bg_color = Color(0.025, 0.045, 0.035, 0.92)
+	health_background.corner_radius_top_left = 10
+	health_background.corner_radius_top_right = 10
+	health_background.corner_radius_bottom_left = 10
+	health_background.corner_radius_bottom_right = 10
+	var health_fill_style := StyleBoxFlat.new()
+	health_fill_style.bg_color = Color("38cfff")
+	health_fill_style.corner_radius_top_left = 10
+	health_fill_style.corner_radius_top_right = 10
+	health_fill_style.corner_radius_bottom_left = 10
+	health_fill_style.corner_radius_bottom_right = 10
+	health_bar.add_theme_stylebox_override("background", health_background)
+	health_bar.add_theme_stylebox_override("fill", health_fill_style)
 	$HUD.add_child(health_bar)
+
+	health_text = Label.new()
+	health_text.name = "BrutusHealthText"
+	health_text.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	health_text.offset_left = 220.0
+	health_text.offset_top = 13.0
+	health_text.offset_right = -220.0
+	health_text.offset_bottom = 37.0
+	health_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	health_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	health_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	health_text.add_theme_font_size_override("font_size", 13)
+	health_text.add_theme_color_override("font_color", Color.WHITE)
+	$HUD.add_child(health_text)
+
+	_build_end_overlay()
+
+
+func _build_end_overlay() -> void:
+	end_overlay = ColorRect.new()
+	end_overlay.name = "EndOverlay"
+	end_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	end_overlay.color = Color(0.015, 0.035, 0.025, 0.78)
+	end_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	end_overlay.visible = false
+	$HUD.add_child(end_overlay)
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -245.0
+	panel.offset_top = -150.0
+	panel.offset_right = 245.0
+	panel.offset_bottom = 150.0
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.06, 0.12, 0.08, 0.97)
+	panel_style.border_width_left = 3
+	panel_style.border_width_top = 3
+	panel_style.border_width_right = 3
+	panel_style.border_width_bottom = 3
+	panel_style.border_color = Color(0.82, 0.64, 0.24, 0.85)
+	panel_style.corner_radius_top_left = 24
+	panel_style.corner_radius_top_right = 24
+	panel_style.corner_radius_bottom_left = 24
+	panel_style.corner_radius_bottom_right = 24
+	panel.add_theme_stylebox_override("panel", panel_style)
+	end_overlay.add_child(panel)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 22)
+	panel.add_child(content)
+	end_title = Label.new()
+	end_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	end_title.add_theme_font_size_override("font_size", 42)
+	content.add_child(end_title)
+	end_summary = Label.new()
+	end_summary.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	end_summary.add_theme_font_size_override("font_size", 18)
+	end_summary.add_theme_color_override("font_color", Color("eaf4e7"))
+	content.add_child(end_summary)
+	var restart_button := Button.new()
+	restart_button.text = "JOGAR NOVAMENTE"
+	restart_button.custom_minimum_size = Vector2(0, 62)
+	restart_button.add_theme_font_size_override("font_size", 20)
+	restart_button.pressed.connect(_restart_match)
+	content.add_child(restart_button)
 
 
 
@@ -372,5 +570,18 @@ func _update_match_label() -> void:
 	if is_instance_valid(enemy_base_reference):
 		var enemy_base := enemy_base_reference as ArenaActor
 		enemy_health = roundi(enemy_base.health)
-	match_label.text = "%02d:%02d  |  %d  |  %s" % [minutes, seconds, enemy_health,
-		"DRAGAO" if dragon_hatched else "OVO"]
+	var blue_towers := _standing_towers(0)
+	var red_towers := _standing_towers(1)
+	match_label.text = "AZUL %dT  |  %02d:%02d  |  %dT VERMELHO  •  CORE %d  •  %s" % [
+		blue_towers, minutes, seconds, red_towers, enemy_health,
+		"DRAGÃO" if dragon_hatched else "OVO"]
+
+
+func _standing_towers(team: int) -> int:
+	var standing := 0
+	for node in get_tree().get_nodes_in_group("arena_actors"):
+		var actor := node as ArenaActor
+		if actor != null and actor.team == team and actor.actor_kind == &"tower" \
+				and not actor.is_defeated:
+			standing += 1
+	return standing

@@ -63,6 +63,7 @@ func reveal(duration: float = 1.2) -> void:
 			/ float(maxi(1, row_count - 1))
 		var rise_duration := duration * 0.36
 		var tween := row.create_tween()
+		tween.set_ignore_time_scale(true)
 		tween.tween_interval(delay)
 		tween.tween_callback(func() -> void: row.visible = true)
 		tween.tween_property(row, "position:y", 0.0, rise_duration) \

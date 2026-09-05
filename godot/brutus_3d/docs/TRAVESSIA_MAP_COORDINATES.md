@@ -118,9 +118,11 @@ marcadores devem ser medidos novamente; não basta reutilizar as coordenadas ant
 ## Ritmo global da Alpha
 
 `TravessiaDefinition.match_rules().game_speed` é a fonte de verdade do ritmo da
-partida. O valor atual é `0.50`: movimentação, animações, ataques, projéteis,
-cooldowns, ondas, respawns e cronômetro avançam a 50% da velocidade normal.
+apresentação. O valor atual é `0.50`: movimentação, animações, ataques e projéteis
+mantêm o peso visual aprovado.
 
-Não aplique multiplicadores adicionais isoladamente para tentar obter o mesmo
-efeito. Se o ritmo global mudar, altere somente `game_speed`; ajustes específicos de
-herói ou unidade continuam pertencendo aos respectivos dados de balanceamento.
+O relógio da partida, o nascimento do dragão, as ondas, cooldowns e respawns usam
+tempo real e não são alongados por `Engine.time_scale`. Assim, `03:00` no HUD dura
+três minutos reais, e não seis. Novos sistemas de contagem regressiva devem seguir
+essa mesma separação; ajustes específicos de herói ou unidade permanecem nos seus
+dados de balanceamento.

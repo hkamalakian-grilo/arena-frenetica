@@ -67,13 +67,13 @@ current = true
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-55, -35, 0)
 light_color = Color(1, 0.91, 0.72, 1)
-light_energy = 1.45
+light_energy = 0.9
 shadow_enabled = true
 
 [node name="FillLight" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-35, 145, 0)
 light_color = Color(0.42, 0.63, 1, 1)
-light_energy = 0.45
+light_energy = 0.28
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
@@ -121,11 +121,12 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 18.0
-offset_top = -270.0
-offset_right = 278.0
-offset_bottom = -10.0
+offset_top = -238.0
+offset_right = 238.0
+offset_bottom = -18.0
 mouse_filter = 0
 script = ExtResource("3_joystick")
+radius = 70.0
 
 [node name="AttackButton" type="Button" parent="HUD"]
 anchors_preset = 3
@@ -133,10 +134,10 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -180.0
-offset_top = -190.0
-offset_right = -38.0
-offset_bottom = -48.0
+offset_left = -154.0
+offset_top = -168.0
+offset_right = -30.0
+offset_bottom = -44.0
 theme_override_colors/font_color = Color(1, 0.86, 0.45, 1)
 theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 24
@@ -151,10 +152,10 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -260.0
-offset_top = -176.0
-offset_right = -134.0
-offset_bottom = -50.0
+offset_left = -244.0
+offset_top = -158.0
+offset_right = -140.0
+offset_bottom = -54.0
 theme_override_colors/font_color = Color(1, 0.72, 0.24, 1)
 theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 17
@@ -169,10 +170,10 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -184.0
-offset_top = -340.0
-offset_right = -38.0
-offset_bottom = -212.0
+offset_left = -158.0
+offset_top = -292.0
+offset_right = -48.0
+offset_bottom = -182.0
 theme_override_colors/font_color = Color(0.85, 0.58, 1, 1)
 theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 17

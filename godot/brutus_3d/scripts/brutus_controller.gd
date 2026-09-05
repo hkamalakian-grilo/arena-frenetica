@@ -36,6 +36,7 @@ var attack_queued := false
 var attack_direction := Vector3(0, 0, 1)
 var health := 1800.0
 var is_defeated := false
+var last_damage_team := -1
 var q_cooldown_left := 0.0
 var r_cooldown_left := 0.0
 var q_direction := Vector3(0, 0, 1)
@@ -68,6 +69,8 @@ func _ready() -> void:
 	var model := BRUTUS_SCENE.instantiate()
 	model.name = "BrutusModel"
 	visual_root.add_child(model)
+	_tune_model_materials(model)
+	_add_team_ring()
 	animation_player = model.find_child("AnimationPlayer", true, false) as AnimationPlayer
 	shield_hand_mesh = model.find_child("BrutusShieldMesh", true, false) as MeshInstance3D
 	assert(animation_player != null, "Brutus GLB must contain an AnimationPlayer")
@@ -148,8 +151,9 @@ func _physics_process(delta: float) -> void:
 	if is_defeated:
 		velocity = Vector3.ZERO
 		return
-	q_cooldown_left = maxf(0.0, q_cooldown_left - delta)
-	r_cooldown_left = maxf(0.0, r_cooldown_left - delta)
+	var real_delta := delta / maxf(Engine.time_scale, 0.001)
+	q_cooldown_left = maxf(0.0, q_cooldown_left - real_delta)
+	r_cooldown_left = maxf(0.0, r_cooldown_left - real_delta)
 	action_elapsed += delta if not action_state.is_empty() else 0.0
 
 	if _is_attack_state():
@@ -180,9 +184,10 @@ func is_targetable() -> bool:
 	return not is_defeated
 
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, source_team: int = -1) -> void:
 	if is_defeated or amount <= 0.0:
 		return
+	last_damage_team = source_team
 	health = maxf(0.0, health - amount)
 	health_changed.emit(health, max_health)
 	if health <= 0.0:
@@ -204,11 +209,51 @@ func revive(at_position: Vector3) -> void:
 	global_position = at_position
 	health = max_health
 	is_defeated = false
+	last_damage_team = -1
 	attack_queued = false
 	action_state = &""
 	velocity = Vector3.ZERO
 	health_changed.emit(health, max_health)
 	_play_locomotion(&"idle", 0.0)
+
+
+func _add_team_ring() -> void:
+	var ring := MeshInstance3D.new()
+	ring.name = "PlayerTeamRing"
+	var mesh := TorusMesh.new()
+	mesh.inner_radius = 0.48
+	mesh.outer_radius = 0.58
+	mesh.rings = 32
+	mesh.ring_segments = 8
+	ring.mesh = mesh
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.18, 0.78, 1.0, 0.88)
+	material.emission_enabled = true
+	material.emission = Color("38cfff")
+	material.emission_energy_multiplier = 0.55
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring.material_override = material
+	ring.position.y = 0.055
+	add_child(ring)
+
+
+func _tune_model_materials(model: Node) -> void:
+	for child in model.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := child as MeshInstance3D
+		if mesh_instance == null or mesh_instance.mesh == null:
+			continue
+		for surface_index in range(mesh_instance.mesh.get_surface_count()):
+			var source := mesh_instance.get_active_material(surface_index) \
+				as StandardMaterial3D
+			if source == null:
+				continue
+			var material := source.duplicate() as StandardMaterial3D
+			material.roughness = maxf(material.roughness, 0.56)
+			if material.emission_enabled:
+				material.emission_energy_multiplier = minf(
+					material.emission_energy_multiplier, 0.65)
+			mesh_instance.set_surface_override_material(surface_index, material)
 
 
 func _process_locomotion(delta: float) -> void:

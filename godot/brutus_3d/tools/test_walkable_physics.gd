@@ -22,6 +22,11 @@ func _run() -> void:
 		"The middle lane must reach the northern river gate")
 	assert(TravessiaDefinition.is_walkable(Vector2(0.0, 4.0)),
 		"The middle lane must reach the southern river gate")
+	for step in range(11):
+		var progress := float(step) / 10.0
+		var diagonal := Vector2(-1.5, 12.2).lerp(Vector2(-5.35, 8.5), progress)
+		assert(TravessiaDefinition.is_walkable(diagonal, false, 0.34),
+			"The visible diagonal from the allied base to the left lane is blocked")
 	assert(not TravessiaDefinition.is_walkable(Vector2(0.0, -15.20)),
 		"The northern base wall must block movement")
 	assert(not TravessiaDefinition.is_walkable(Vector2(0.0, 15.20)),

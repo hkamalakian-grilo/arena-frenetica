@@ -75,6 +75,12 @@ func _run() -> void:
 		await physics_frame
 	assert(brutus.action_state.is_empty(), "Q did not finish")
 	assert(brutus.q_cooldown_left > 0.0, "Q cooldown was not applied")
+	brutus.q_cooldown_left = 1.0
+	Engine.time_scale = 0.5
+	await create_timer(0.60, true, false, true).timeout
+	assert(brutus.q_cooldown_left < 0.50,
+		"Ability cooldown must use real time at the canonical 50% pace")
+	Engine.time_scale = 1.0
 
 	brutus.request_r()
 	assert(brutus.action_state == &"ultimate", "Ultimate did not start")
