@@ -2,6 +2,8 @@ class_name BrutusController
 extends CharacterBody3D
 
 signal ability_impact(kind: StringName, world_position: Vector3)
+signal action_started(kind: StringName)
+signal shield_returned
 signal health_changed(current: float, maximum: float)
 signal defeated
 
@@ -17,6 +19,15 @@ signal defeated
 @export var q_dash_speed := 10.5
 @export var r_cooldown := 35.0
 @export var movement_collision_radius := 0.34
+## Soft aim assist: attacks and Investida turn toward the best enemy inside
+## this range/cone so touch players do not whiff by a few degrees.
+@export var attack_assist_range := 2.4
+@export var attack_assist_cone_degrees := 110.0
+@export var q_assist_range := 6.5
+@export var q_assist_cone_degrees := 70.0
+## Inputs pressed during another action are kept alive for this long and fire
+## as soon as the current action can be left.
+@export var input_buffer_time := 0.35
 
 const BRUTUS_SCENE := preload("res://assets/brutus/brutus.glb")
 const SHIELD_SCENE := preload("res://assets/brutus/brutus_shield.glb")
@@ -52,6 +63,9 @@ var shield_projectile_target := Vector3.ZERO
 var shield_projectile_reached_end := false
 var shield_trail_timer := 0.0
 var movement_map: TravessiaMap
+var buffered_action: StringName = &""
+var buffer_left := 0.0
+var last_assist_target: Node3D
 
 
 func _ready() -> void:
@@ -98,7 +112,8 @@ func request_attack() -> void:
 		if action_elapsed >= 0.16:
 			attack_queued = true
 		return
-	if not action_state.is_empty():
+	if not _is_free_for_action():
+		_buffer(&"attack")
 		return
 	_start_attack()
 
@@ -106,29 +121,119 @@ func request_attack() -> void:
 func _start_attack() -> void:
 	var clip: StringName = &"attack" if attack_combo_index == 0 else &"attack_alt"
 	attack_combo_index = (attack_combo_index + 1) % 2
-	attack_direction = last_direction.normalized()
+	attack_direction = _assisted_direction(last_direction.normalized(),
+		attack_assist_range, attack_assist_cone_degrees)
 	attack_has_impacted = false
 	_begin_action(clip)
 	animation_player.play(clip, 0.05)
+	action_started.emit(&"attack")
 
 
 func request_q() -> void:
-	if is_defeated or not action_state.is_empty() or q_cooldown_left > 0.0:
+	if is_defeated or q_cooldown_left > 0.0:
 		return
-	q_direction = last_direction.normalized()
+	if not _is_free_for_action() and not _can_cancel_into_ability():
+		_buffer(&"q")
+		return
+	attack_queued = false
+	q_direction = _assisted_direction(last_direction.normalized(),
+		q_assist_range, q_assist_cone_degrees)
+	last_direction = q_direction
 	q_cooldown_left = q_cooldown
 	q_trail_timer = 0.0
 	_begin_action(&"q")
 	animation_player.play(&"q", 0.08)
+	action_started.emit(&"q")
 
 
 func request_r() -> void:
-	if is_defeated or not action_state.is_empty() or r_cooldown_left > 0.0 or shield_projectile != null:
+	if is_defeated or r_cooldown_left > 0.0 or shield_projectile != null:
 		return
+	if not _is_free_for_action() and not _can_cancel_into_ability():
+		_buffer(&"r")
+		return
+	attack_queued = false
+	last_direction = _assisted_direction(last_direction.normalized(),
+		q_assist_range, q_assist_cone_degrees)
 	r_cooldown_left = r_cooldown
 	r_has_impacted = false
 	_begin_action(&"ultimate")
 	animation_player.play(&"ultimate", 0.10)
+	action_started.emit(&"r")
+
+
+func _is_free_for_action() -> bool:
+	# The hurt recoil is readable but must never eat a player command.
+	return action_state.is_empty() or action_state == &"hurt"
+
+
+func _can_cancel_into_ability() -> bool:
+	# After a basic hit has landed, Q/R may cut the recovery so combos feel
+	# snappy; abilities themselves are never interrupted by another ability.
+	return _is_attack_state() and attack_has_impacted
+
+
+func _buffer(kind: StringName) -> void:
+	buffered_action = kind
+	buffer_left = input_buffer_time
+
+
+func _flush_buffer() -> void:
+	if buffered_action.is_empty():
+		return
+	var kind := buffered_action
+	buffered_action = &""
+	buffer_left = 0.0
+	match kind:
+		&"attack":
+			request_attack()
+		&"q":
+			request_q()
+		&"r":
+			request_r()
+
+
+## Returns the direction toward the best enemy within range and cone, or the
+## fallback when nothing worth turning toward exists.
+func _assisted_direction(fallback: Vector3, max_range: float, cone_degrees: float) -> Vector3:
+	last_assist_target = null
+	if fallback.length_squared() < 0.001 or not is_inside_tree():
+		return fallback
+	var half_cone := deg_to_rad(cone_degrees * 0.5)
+	var origin := Vector2(global_position.x, global_position.z)
+	var forward := Vector2(fallback.x, fallback.z).normalized()
+	var best: Node3D
+	var best_score := INF
+	for node in get_tree().get_nodes_in_group("damageable"):
+		var candidate := node as Node3D
+		if candidate == null or candidate == self or not candidate.has_method("get_team"):
+			continue
+		if int(candidate.call("get_team")) == get_team():
+			continue
+		if candidate.has_method("is_targetable") and not bool(candidate.call("is_targetable")):
+			continue
+		var offset := Vector2(candidate.global_position.x, candidate.global_position.z) - origin
+		var distance := offset.length()
+		if distance < 0.05 or distance > max_range:
+			continue
+		var angle := absf(forward.angle_to(offset / distance))
+		if angle > half_cone:
+			continue
+		# Prefer close targets, then those already in front. Units beat
+		# structures so a fight near a tower still aims at the fighter.
+		var score := distance + angle * 1.6
+		var actor := candidate as ArenaActor
+		if actor != null and (actor.actor_kind == &"tower" or actor.actor_kind == &"base"):
+			score += 1.5
+		if score < best_score:
+			best_score = score
+			best = candidate
+	if best == null:
+		return fallback
+	last_assist_target = best
+	var direction := best.global_position - global_position
+	direction.y = 0.0
+	return direction.normalized() if direction.length_squared() > 0.001 else fallback
 
 
 func _begin_action(next_state: StringName) -> void:
@@ -155,6 +260,12 @@ func _physics_process(delta: float) -> void:
 	q_cooldown_left = maxf(0.0, q_cooldown_left - real_delta)
 	r_cooldown_left = maxf(0.0, r_cooldown_left - real_delta)
 	action_elapsed += delta if not action_state.is_empty() else 0.0
+	if buffer_left > 0.0:
+		buffer_left -= real_delta
+		if buffer_left <= 0.0:
+			buffered_action = &""
+		elif _is_free_for_action() or _can_cancel_into_ability():
+			_flush_buffer()
 
 	if _is_attack_state():
 		_process_attack(delta)
@@ -211,6 +322,8 @@ func revive(at_position: Vector3) -> void:
 	is_defeated = false
 	last_damage_team = -1
 	attack_queued = false
+	buffered_action = &""
+	buffer_left = 0.0
 	action_state = &""
 	velocity = Vector3.ZERO
 	health_changed.emit(health, max_health)
@@ -474,6 +587,7 @@ func _update_shield_projectile(delta: float) -> void:
 			shield_projectile.queue_free()
 			shield_projectile = null
 			shield_hand_mesh.visible = true
+			shield_returned.emit()
 			return
 	shield_trail_timer -= delta
 	if shield_trail_timer <= 0.0:

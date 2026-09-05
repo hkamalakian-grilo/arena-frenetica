@@ -27,6 +27,10 @@ final é este projeto Godot e não precisa reproduzir as limitações visuais do
 - Travessia em retrato com apresentação 2.5D fiel à arte aprovada: textura
   canônica sobre malha subdividida e relevo alinhado por mapa de altura.
 - Renderizador `gl_compatibility`, adequado ao primeiro alvo mobile/web.
+- Sensação de combate: mira assistida, buffer de comando, cancelamentos,
+  hitstop, tremor proporcional, números de dano, vinheta de dano, atordoamento
+  da Investida, lentidão do Escudo e catorze efeitos sonoros sintéticos
+  (tecla M silencia). Ver `docs/GAME_FEEL.md`.
 
 ## Como executar
 
@@ -56,6 +60,7 @@ godot --path godot/brutus_3d
 - `tools/build_roster_family.py`: reconstrói modelos, previews, rigs e animações.
 - `tools/inspect_roster_family.gd`: valida malhas e contratos de clips do elenco.
 - `tools/test_abilities.gd`: executa automaticamente Investida e Escudo Bumerangue e valida seus estados.
+- `tools/test_game_feel.gd`: valida mira assistida, buffer, controle de grupo, hitstop, feedback e áudio.
 - `scripts/data/travessia_definition.gd`: fonte canônica das posições e regras do mapa.
 - `scripts/travessia_map.gd`: apresentação jogável alinhada à arte aprovada da Travessia.
 - `assets/maps/travessia_clean_v1.png`: referência artística original preservada.

@@ -34,6 +34,9 @@ var team_kills := [0, 0]
 var team_towers_destroyed := [0, 0]
 var team_damage_multiplier := {0: 1.0, 1: 1.0}
 var dragon_slain_by := -1
+var feedback: CombatFeedback
+var sfx: ArenaSfx
+var last_brutus_health := -1.0
 @export var follow_player_camera := false
 
 func _ready() -> void:
@@ -42,6 +45,11 @@ func _ready() -> void:
 	add_child(arena_map)
 	arena_map.build()
 	_build_match_hud()
+	sfx = ArenaSfx.new()
+	add_child(sfx)
+	feedback = CombatFeedback.new()
+	add_child(feedback)
+	feedback.setup(self, $HUD)
 	_build_match()
 	brutus.global_position = TravessiaDefinition.PLAYER_SPAWN
 	brutus.last_direction = Vector3(0, 0, -1)
@@ -51,6 +59,8 @@ func _ready() -> void:
 	q_button.pressed.connect(brutus.request_q)
 	r_button.pressed.connect(brutus.request_r)
 	brutus.ability_impact.connect(_on_ability_impact)
+	brutus.action_started.connect(_on_brutus_action_started)
+	brutus.shield_returned.connect(func() -> void: sfx.play(&"r_catch", -3.0))
 	brutus.health_changed.connect(_on_brutus_health_changed)
 	brutus.defeated.connect(_on_brutus_defeated)
 	_on_brutus_health_changed(brutus.health, brutus.max_health)
@@ -98,23 +108,59 @@ func _update_ability_button(button: Button, ready_text: String, cooldown: float)
 	button.disabled = cooldown > 0.0
 	button.text = "%s\n%.1f s" % [ready_text.left(1), cooldown] if cooldown > 0.0 else ready_text
 
+func _on_brutus_action_started(kind: StringName) -> void:
+	match kind:
+		&"attack":
+			sfx.play(&"swing", -6.0, 0.12)
+		&"q":
+			sfx.play(&"q_charge", -4.0)
+		&"r":
+			sfx.play(&"r_throw", -2.0)
+
+
 func _on_ability_impact(kind: StringName, world_position: Vector3) -> void:
 	var radius := 1.35
 	var damage := 95.0
+	var hitstop := 0.05
+	var shake_time := 0.10
+	var shake_strength := 0.07
+	var hit_clip: StringName = &"hit"
 	if kind == &"q":
 		radius = 1.85
 		damage = 150.0
-		camera_shake_left = 0.16
-		camera_shake_strength = 0.10
+		hitstop = 0.08
+		shake_time = 0.16
+		shake_strength = 0.10
+		hit_clip = &"q_impact"
 	elif kind == &"ultimate":
 		radius = 2.15
 		damage = 190.0
-		camera_shake_left = 0.38
-		camera_shake_strength = 0.24
-	else:
-		camera_shake_left = 0.10
-		camera_shake_strength = 0.07
-	_damage_enemies(world_position, radius, damage)
+		hitstop = 0.11
+		shake_time = 0.38
+		shake_strength = 0.24
+		hit_clip = &"r_impact"
+	var hits := _damage_enemies(world_position, radius, damage)
+	if hits.is_empty():
+		# A whiff still shakes a little so the swing reads, but never freezes.
+		camera_shake_left = shake_time * 0.4
+		camera_shake_strength = shake_strength * 0.45
+		return
+	camera_shake_left = shake_time
+	camera_shake_strength = shake_strength * minf(1.0 + 0.15 * (hits.size() - 1), 1.6)
+	sfx.play(hit_clip, 0.0 if kind != &"attack" else -2.0)
+	feedback.request_hitstop(hitstop)
+	for target in hits:
+		var node := target as Node3D
+		if node == null:
+			continue
+		if kind == &"q" and node.has_method("apply_stun"):
+			node.call("apply_stun", 0.8)
+			feedback.spawn_text(node.global_position + Vector3(0, 0.6, 0), "ATORDOADO",
+				Color(1.0, 0.86, 0.3))
+		elif kind == &"ultimate" and node.has_method("apply_slow"):
+			node.call("apply_slow", 0.5, 1.6)
+	if kind == &"q":
+		sfx.play(&"stun", -9.0)
 
 func _update_camera_shake(delta: float) -> void:
 	if camera_shake_left > 0.0:
@@ -235,6 +281,9 @@ func _hatch_dragon() -> void:
 	var dragon_data := TravessiaDefinition.dragon_definition()
 	var dragon := _spawn_actor(dragon_data, dragon_data.position)
 	dragon.play_spawn()
+	sfx.play(&"dragon", 2.0, 0.02)
+	camera_shake_left = 0.5
+	camera_shake_strength = 0.16
 	status_label.text = "O OVO CHOCOU — DRAGÃO NO CENTRO!"
 	status_label.modulate = Color("dca3ff")
 	_get_tree_timer_clear_status()
@@ -273,9 +322,12 @@ func _team_score(team: int) -> float:
 	return score
 
 
-func _damage_enemies(center: Vector3, radius: float, damage: float) -> void:
+## Applies Brutus damage around `center`; returns the nodes that were hit.
+func _damage_enemies(center: Vector3, radius: float, damage: float) -> Array:
+	var hits: Array = []
 	if match_over:
-		return
+		return hits
+	var dealt := damage * float(team_damage_multiplier.get(0, 1.0))
 	for node in get_tree().get_nodes_in_group("damageable"):
 		var target := node as Node3D
 		if target == null or target == brutus or not target.has_method("get_team"):
@@ -288,18 +340,29 @@ func _damage_enemies(center: Vector3, radius: float, damage: float) -> void:
 			Vector2(target.global_position.x, target.global_position.z)
 		)
 		if distance <= radius:
-			target.call("take_damage",
-				damage * float(team_damage_multiplier.get(0, 1.0)), 0)
+			target.call("take_damage", dealt, 0)
+			hits.append(target)
+			if feedback != null:
+				feedback.spawn_damage_number(target.global_position, dealt,
+					Color(1.0, 0.92, 0.55) if dealt < 120.0 else Color(1.0, 0.68, 0.2),
+					1.0 if dealt < 120.0 else 1.25)
+	return hits
 
 
 func _on_actor_defeated(actor: ArenaActor) -> void:
+	if actor.actor_kind == &"minion" and actor.last_damage_team == 0 and sfx != null:
+		sfx.play(&"hit", -10.0, 0.2)
 	if actor.actor_kind == &"tower":
 		team_towers_destroyed[1 - actor.team] += 1
+		sfx.play(&"tower_down", 2.0, 0.03)
+		camera_shake_left = 0.45
+		camera_shake_strength = 0.22
 		_refresh_base_protection()
 		status_label.text = "TORRE INIMIGA DESTRUÍDA!" if actor.team == 1 \
 			else "TORRE ALIADA DESTRUÍDA!"
 		_get_tree_timer_clear_status()
 	elif actor.actor_kind == &"dragon":
+		sfx.play(&"dragon", 1.0, 0.02)
 		_apply_dragon_reward(actor.last_damage_team)
 	elif actor.actor_kind == &"base":
 		_finish_match(1 - actor.team, "torre principal destruída")
@@ -332,9 +395,16 @@ func _apply_dragon_reward(team: int) -> void:
 	_get_tree_timer_clear_status()
 
 
-func _on_hero_bot_defeated(_hero: HeroBot, killer_team: int) -> void:
+func _on_hero_bot_defeated(hero: HeroBot, killer_team: int) -> void:
 	if killer_team >= 0 and killer_team <= 1:
 		team_kills[killer_team] += 1
+	if killer_team == 0 and hero.team == 1:
+		sfx.play(&"kill", 1.0, 0.02)
+		feedback.spawn_text(hero.global_position + Vector3(0, 0.8, 0), "ABATE!",
+			Color(1.0, 0.82, 0.2))
+		feedback.request_hitstop(0.09)
+		camera_shake_left = 0.22
+		camera_shake_strength = 0.12
 
 
 func _refresh_base_protection() -> void:
@@ -354,6 +424,14 @@ func _refresh_base_protection() -> void:
 
 
 func _on_brutus_health_changed(current: float, maximum: float) -> void:
+	if last_brutus_health >= 0.0 and current < last_brutus_health and feedback != null:
+		var lost := last_brutus_health - current
+		feedback.flash_hurt(lost / maximum * 6.0)
+		feedback.spawn_damage_number(brutus.global_position, lost, Color(1.0, 0.36, 0.36))
+		sfx.play(&"hurt", -5.0, 0.1)
+	last_brutus_health = current
+	if feedback != null:
+		feedback.set_player_health_ratio(current / maxf(maximum, 1.0))
 	if health_bar == null:
 		return
 	health_bar.max_value = maximum
@@ -367,6 +445,7 @@ func _on_brutus_defeated() -> void:
 	if brutus.last_damage_team >= 0 and brutus.last_damage_team <= 1:
 		team_kills[brutus.last_damage_team] += 1
 	status_label.text = "BRUTUS CAIU — RETORNO EM 3 s"
+	sfx.play(&"death", 0.0, 0.0)
 	attack_button.disabled = true
 	q_button.disabled = true
 	r_button.disabled = true

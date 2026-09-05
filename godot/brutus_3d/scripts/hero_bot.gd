@@ -22,6 +22,10 @@ var last_damage_team := -1
 var damage_multiplier := 1.0
 var spawn_position := Vector3.ZERO
 var objective: Node3D
+var stun_left := 0.0
+var slow_left := 0.0
+var slow_factor := 1.0
+var stun_marker: MeshInstance3D
 
 var visual_model: StylizedActor3D
 var nameplate: Label3D
@@ -85,6 +89,49 @@ func take_damage(amount: float, source_team: int = -1) -> void:
 		_finish_death_visual()
 
 
+func apply_stun(seconds: float) -> void:
+	if is_defeated:
+		return
+	stun_left = maxf(stun_left, seconds)
+	_set_stun_marker(true)
+
+
+func apply_slow(factor: float, seconds: float) -> void:
+	if is_defeated:
+		return
+	slow_factor = minf(slow_factor if slow_left > 0.0 else 1.0, factor)
+	slow_left = maxf(slow_left, seconds)
+
+
+func is_stunned() -> bool:
+	return stun_left > 0.0
+
+
+func _set_stun_marker(visible_now: bool) -> void:
+	if stun_marker == null:
+		if not visible_now:
+			return
+		stun_marker = MeshInstance3D.new()
+		stun_marker.name = "StunMarker"
+		var mesh := TorusMesh.new()
+		mesh.inner_radius = 0.24
+		mesh.outer_radius = 0.33
+		mesh.rings = 20
+		mesh.ring_segments = 6
+		stun_marker.mesh = mesh
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color(1.0, 0.86, 0.25, 0.95)
+		material.emission_enabled = true
+		material.emission = Color(1.0, 0.8, 0.2)
+		material.emission_energy_multiplier = 1.2
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.no_depth_test = true
+		stun_marker.material_override = material
+		stun_marker.position.y = 2.55
+		add_child(stun_marker)
+	stun_marker.visible = visible_now
+
+
 func _physics_process(delta: float) -> void:
 	if is_defeated:
 		respawn_left -= delta / maxf(Engine.time_scale, 0.001)
@@ -92,6 +139,19 @@ func _physics_process(delta: float) -> void:
 			_revive()
 		return
 	attack_timer = maxf(0.0, attack_timer - delta)
+	if stun_left > 0.0:
+		stun_left = maxf(0.0, stun_left - delta)
+		if stun_left <= 0.0:
+			_set_stun_marker(false)
+		else:
+			velocity = Vector3.ZERO
+			stun_marker.rotation.y += delta * 9.0
+			visual_model.update_motion(delta, facing_direction, 0.0)
+			return
+	if slow_left > 0.0:
+		slow_left = maxf(0.0, slow_left - delta)
+		if slow_left <= 0.0:
+			slow_factor = 1.0
 	var priority_unit := _nearest_enemy_unit(4.6)
 	if priority_unit != null:
 		objective = priority_unit
@@ -107,7 +167,7 @@ func _physics_process(delta: float) -> void:
 	if distance > attack_range:
 		var direction := offset.normalized()
 		facing_direction = direction
-		velocity = direction * move_speed
+		velocity = direction * move_speed * (slow_factor if slow_left > 0.0 else 1.0)
 		var previous_position := global_position
 		move_and_slide()
 		_constrain_to_walkable_area(previous_position)
@@ -216,6 +276,10 @@ func _revive() -> void:
 	is_defeated = false
 	last_damage_team = -1
 	objective = null
+	stun_left = 0.0
+	slow_left = 0.0
+	slow_factor = 1.0
+	_set_stun_marker(false)
 	visual_model.revive()
 	nameplate.visible = false
 	health_fill.visible = true

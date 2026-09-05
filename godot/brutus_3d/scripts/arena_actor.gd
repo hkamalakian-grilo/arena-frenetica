@@ -22,6 +22,10 @@ var is_protected := false
 var last_damage_team := -1
 var attack_timer := 0.0
 var objective: Node3D
+var stun_left := 0.0
+var slow_left := 0.0
+var slow_factor := 1.0
+var stun_marker: MeshInstance3D
 
 var health_fill: MeshInstance3D
 var health_backdrop: MeshInstance3D
@@ -101,6 +105,68 @@ func take_damage(amount: float, source_team: int = -1) -> void:
 			queue_free()
 
 
+## Crowd control from Brutus. Structures ignore it; the dragon only briefly.
+func apply_stun(seconds: float) -> void:
+	if is_defeated or actor_kind == &"tower" or actor_kind == &"base" \
+			or actor_kind == &"dragon_egg":
+		return
+	if actor_kind == &"dragon":
+		seconds *= 0.4
+	stun_left = maxf(stun_left, seconds)
+	_set_stun_marker(true)
+
+
+func apply_slow(factor: float, seconds: float) -> void:
+	if is_defeated or actor_kind != &"minion" and actor_kind != &"dragon":
+		return
+	slow_factor = minf(slow_factor if slow_left > 0.0 else 1.0, factor)
+	slow_left = maxf(slow_left, seconds)
+
+
+func is_stunned() -> bool:
+	return stun_left > 0.0
+
+
+func _tick_crowd_control(delta: float) -> void:
+	if stun_left > 0.0:
+		stun_left = maxf(0.0, stun_left - delta)
+		if stun_left <= 0.0:
+			_set_stun_marker(false)
+	if slow_left > 0.0:
+		slow_left = maxf(0.0, slow_left - delta)
+		if slow_left <= 0.0:
+			slow_factor = 1.0
+
+
+func _current_move_speed() -> float:
+	return move_speed * (slow_factor if slow_left > 0.0 else 1.0)
+
+
+func _set_stun_marker(visible_now: bool) -> void:
+	if stun_marker == null:
+		if not visible_now:
+			return
+		stun_marker = MeshInstance3D.new()
+		stun_marker.name = "StunMarker"
+		var mesh := TorusMesh.new()
+		mesh.inner_radius = 0.22
+		mesh.outer_radius = 0.30
+		mesh.rings = 20
+		mesh.ring_segments = 6
+		stun_marker.mesh = mesh
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color(1.0, 0.86, 0.25, 0.95)
+		material.emission_enabled = true
+		material.emission = Color(1.0, 0.8, 0.2)
+		material.emission_energy_multiplier = 1.2
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.no_depth_test = true
+		stun_marker.material_override = material
+		stun_marker.position.y = 1.55 if actor_kind == &"minion" else 3.2
+		add_child(stun_marker)
+	stun_marker.visible = visible_now
+
+
 func set_protected(value: bool) -> void:
 	is_protected = value
 	if actor_art != null:
@@ -117,6 +183,14 @@ func _physics_process(delta: float) -> void:
 	if is_defeated:
 		return
 	attack_timer = maxf(0.0, attack_timer - delta)
+	_tick_crowd_control(delta)
+	if stun_left > 0.0:
+		velocity = Vector3.ZERO
+		if stun_marker != null:
+			stun_marker.rotation.y += delta * 9.0
+		if actor_model != null:
+			actor_model.update_motion(delta, Vector3.ZERO, 0.0)
+		return
 	if actor_kind == &"minion":
 		_process_minion()
 		actor_model.update_motion(delta, velocity.normalized(),
@@ -140,7 +214,7 @@ func _process_minion() -> void:
 	if absf(z_distance) > attack_range:
 		# Canonical lane rule: no chasing, curves or lateral combat movement.
 		global_position.x = lane_x
-		velocity = Vector3(0.0, 0.0, signf(z_distance) * move_speed)
+		velocity = Vector3(0.0, 0.0, signf(z_distance) * _current_move_speed())
 		move_and_slide()
 	else:
 		velocity = Vector3.ZERO
@@ -171,6 +245,7 @@ func _try_attack(target: Node3D) -> void:
 	elif actor_kind == &"dragon":
 		_play_creature_animation(&"attack")
 	if actor_kind == &"tower":
+		get_tree().call_group("arena_sfx", "play", &"tower_shot", -8.0, 0.08)
 		_launch_tower_projectile(target)
 	else:
 		target.call("take_damage", attack_damage, team)
