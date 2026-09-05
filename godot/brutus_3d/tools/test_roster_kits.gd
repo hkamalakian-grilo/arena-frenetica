@@ -340,6 +340,19 @@ func _run() -> void:
 	assert(joystick.active and joystick.base_center == Vector2(300, 300), "Joystick must float to the touch")
 	joystick.call("_release")
 
+	# Whole-map view on demand: tapping the minimap zooms out and back.
+	var camera := game.get_node("CameraRig/Camera3D") as Camera3D
+	var map_panel := game.get_node("HUD/Minimap") as Minimap
+	map_panel.tapped.emit()
+	await create_timer(0.6, true, false, true).timeout
+	assert(game.full_map_view and is_equal_approx(camera.size, 37.0),
+		"Tapping the minimap must zoom out to the whole map")
+	assert(game.get_node("CameraRig").global_position.length() < 0.8,
+		"Whole-map view must centre the camera rig")
+	map_panel.tapped.emit()
+	await create_timer(0.6, true, false, true).timeout
+	assert(not game.full_map_view and is_equal_approx(camera.size, 14.0),
+		"Tapping again must return to the close camera")
 	var r_button := game.get_node("HUD/RButton") as Control
 	assert(r_button.offset_left >= -122.0, "R button must sit clear of the blue right tower")
 	print("ROSTER_KITS_OK lyra=true nix=true sol=true bots=true nav=true minions=true hud=true buttons=true")

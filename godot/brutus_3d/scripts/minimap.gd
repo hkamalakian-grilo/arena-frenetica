@@ -4,20 +4,32 @@ extends Control
 ## Schematic overview drawn every frame: lanes, river, island, structures,
 ## units, the player and the rectangle the close camera currently shows.
 
+signal tapped
+
 const PANEL_SIZE := Vector2(92.0, 174.0)
 const MAP_HALF := Vector2(9.01, 17.0)
 
 var game: Node
 var camera: Camera3D
 var camera_rig: Node3D
+var full_view := false
 
 
 func setup(match_root: Node) -> void:
 	game = match_root
 	camera = match_root.get_node("CameraRig/Camera3D") as Camera3D
 	camera_rig = match_root.get_node("CameraRig") as Node3D
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	custom_minimum_size = PANEL_SIZE
+
+
+## Tapping the minimap toggles the whole-map camera.
+func _gui_input(event: InputEvent) -> void:
+	if (event is InputEventScreenTouch and event.pressed) \
+			or (event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT):
+		tapped.emit()
+		accept_event()
 
 
 func _to_panel(world_x: float, world_z: float) -> Vector2:
@@ -34,8 +46,10 @@ func _rect(center: Vector2, half: Vector2) -> Rect2:
 
 func _draw() -> void:
 	var panel := Rect2(Vector2.ZERO, size)
+	draw_rect(Rect2(panel.position + Vector2(0, 3), panel.size).grow(3.0), Color(0, 0, 0, 0.35))
 	draw_rect(panel, Color(0.05, 0.10, 0.06, 0.82))
-	draw_rect(panel, Color(0.86, 0.68, 0.28, 0.85), false, 2.0)
+	draw_rect(panel, Color(1.0, 0.85, 0.45, 1.0) if full_view else Color(0.86, 0.68, 0.28, 0.85),
+		false, 3.0 if full_view else 2.0)
 	# Terrain: grass, river band, lanes and bridges, island.
 	draw_rect(panel.grow(-2.0), Color(0.24, 0.45, 0.22, 0.9))
 	draw_rect(_rect(Vector2(0.0, 0.0), Vector2(MAP_HALF.x, 1.55)), Color(0.19, 0.48, 0.70, 0.95))
@@ -95,7 +109,16 @@ func _draw() -> void:
 		var center_z := camera_rig.global_position.z + _camera_ground_offset()
 		var window := _rect(Vector2(camera_rig.global_position.x, center_z),
 			Vector2(half_width, half_depth))
-		draw_rect(window, Color(1.0, 1.0, 1.0, 0.85), false, 1.5)
+		draw_rect(window.intersection(panel), Color(1.0, 1.0, 1.0, 0.85), false, 1.5)
+	# Tap hint under the panel.
+	var font := get_theme_default_font()
+	var hint := "MAPA" if not full_view else "VOLTAR"
+	var hint_size := 11
+	var width := font.get_string_size(hint, HORIZONTAL_ALIGNMENT_CENTER, -1, hint_size).x
+	var at := Vector2((size.x - width) * 0.5, size.y + 13.0)
+	draw_string_outline(font, at, hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_size, 4,
+		Color(0.02, 0.03, 0.03, 0.9))
+	draw_string(font, at, hint, HORIZONTAL_ALIGNMENT_LEFT, -1, hint_size, Color(1.0, 0.85, 0.45))
 
 
 ## Where the camera's centre ray hits the ground, relative to the rig.

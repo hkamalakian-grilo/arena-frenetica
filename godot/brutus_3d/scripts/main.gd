@@ -52,6 +52,15 @@ const CAMERA_LIMIT_Z_MIN := -8.8
 const CAMERA_LIMIT_Z_MAX := 8.8
 const CAMERA_LEAD := 0.9
 const CAMERA_FOLLOW_SPEED := 6.0
+const CLOSE_CAMERA_POSITION := Vector3(0, 26, 15)
+const CLOSE_CAMERA_TILT := -60.0
+const CLOSE_CAMERA_SIZE := 14.0
+const FULL_CAMERA_POSITION := Vector3(0, 36, 9.65)
+const FULL_CAMERA_TILT := -75.0
+const FULL_CAMERA_SIZE := 37.0
+var full_map_view := false
+var view_blend := 0.0
+var view_tween: Tween
 @export var follow_player_camera := true
 
 func _ready() -> void:
@@ -71,6 +80,11 @@ func _ready() -> void:
 	brutus.last_direction = Vector3(0, 0, -1)
 	camera_rest_position = camera.position
 	snap_camera_to_player()
+	if not InputMap.has_action("toggle_map"):
+		InputMap.add_action("toggle_map")
+		var key := InputEventKey.new()
+		key.physical_keycode = KEY_TAB
+		InputMap.action_add_event("toggle_map", key)
 	joystick.vector_changed.connect(brutus.set_virtual_input)
 	attack_button.quick_cast.connect(brutus.request_attack)
 	_wire_aim_button(q_button, &"q")
@@ -244,11 +258,38 @@ func _on_ability_impact(kind: StringName, world_position: Vector3) -> void:
 ## Brawler-style camera: follows Brutus smoothly, with a small lead in his
 ## facing direction, and never shows the void beyond the painted map.
 func _update_camera_follow(delta: float) -> void:
+	# Blend between the close brawler view (0) and the whole-map view (1).
+	camera_rest_position = CLOSE_CAMERA_POSITION.lerp(FULL_CAMERA_POSITION, view_blend)
+	camera.rotation_degrees.x = lerpf(CLOSE_CAMERA_TILT, FULL_CAMERA_TILT, view_blend)
+	camera.size = lerpf(CLOSE_CAMERA_SIZE, FULL_CAMERA_SIZE, view_blend)
 	if not follow_player_camera:
 		camera_rig.global_position = Vector3.ZERO
 		return
+	var target := _camera_target().lerp(Vector3.ZERO, view_blend)
 	var blend := 1.0 - exp(-CAMERA_FOLLOW_SPEED * delta / maxf(Engine.time_scale, 0.001))
-	camera_rig.global_position = camera_rig.global_position.lerp(_camera_target(), blend)
+	camera_rig.global_position = camera_rig.global_position.lerp(target, blend)
+
+
+## Whole-map view on demand: tap the minimap or press Tab. Play continues.
+func toggle_full_map_view() -> void:
+	set_full_map_view(not full_map_view)
+
+
+func set_full_map_view(enabled: bool) -> void:
+	full_map_view = enabled
+	if view_tween != null and view_tween.is_valid():
+		view_tween.kill()
+	view_tween = create_tween()
+	view_tween.tween_property(self, "view_blend", 1.0 if enabled else 0.0, 0.38) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	if minimap != null:
+		minimap.full_view = enabled
+		minimap.queue_redraw()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("toggle_map"):
+		toggle_full_map_view()
 
 
 func _camera_target() -> Vector3:
@@ -715,6 +756,7 @@ func _build_match_hud() -> void:
 	minimap = Minimap.new()
 	minimap.name = "Minimap"
 	minimap.setup(self)
+	minimap.tapped.connect(toggle_full_map_view)
 	minimap.offset_left = 12.0
 	minimap.offset_top = 100.0
 	minimap.offset_right = 12.0 + Minimap.PANEL_SIZE.x
