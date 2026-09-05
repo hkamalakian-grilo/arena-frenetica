@@ -1,8 +1,9 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/brutus_controller.gd" id="2_brutus"]
 [ext_resource type="Script" path="res://scripts/virtual_joystick.gd" id="3_joystick"]
+[ext_resource type="Script" path="res://scripts/ability_button.gd" id="4_ability"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_brutus"]
 radius = 0.34
@@ -117,13 +118,14 @@ text = "Velocidade: 0%"
 
 [node name="VirtualJoystick" type="Control" parent="HUD"]
 layout_mode = 3
-anchors_preset = 2
-anchor_top = 1.0
+anchors_preset = 0
+anchor_top = 0.42
+anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = 18.0
-offset_top = -238.0
-offset_right = 238.0
-offset_bottom = -18.0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
 mouse_filter = 0
 script = ExtResource("3_joystick")
 radius = 70.0
@@ -145,6 +147,9 @@ theme_override_styles/normal = SubResource("StyleBox_action_normal")
 theme_override_styles/hover = SubResource("StyleBox_action_hover")
 theme_override_styles/pressed = SubResource("StyleBox_action_pressed")
 text = "ATAQUE"
+script = ExtResource("4_ability")
+aimable = false
+repeat_while_held = true
 
 [node name="QButton" type="Button" parent="HUD"]
 anchors_preset = 3
@@ -163,6 +168,7 @@ theme_override_styles/normal = SubResource("StyleBox_action_normal")
 theme_override_styles/hover = SubResource("StyleBox_action_hover")
 theme_override_styles/pressed = SubResource("StyleBox_action_pressed")
 text = "Q  INVESTIDA"
+script = ExtResource("4_ability")
 
 [node name="RButton" type="Button" parent="HUD"]
 anchors_preset = 3
@@ -170,10 +176,10 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -158.0
-offset_top = -292.0
-offset_right = -48.0
-offset_bottom = -182.0
+offset_left = -122.0
+offset_top = -306.0
+offset_right = -18.0
+offset_bottom = -202.0
 theme_override_colors/font_color = Color(0.85, 0.58, 1, 1)
 theme_override_colors/font_pressed_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 17
@@ -181,6 +187,7 @@ theme_override_styles/normal = SubResource("StyleBox_action_normal")
 theme_override_styles/hover = SubResource("StyleBox_action_hover")
 theme_override_styles/pressed = SubResource("StyleBox_action_pressed")
 text = "R  ARREMESSO"
+script = ExtResource("4_ability")
 
 [node name="Prototype" type="Label" parent="HUD"]
 visible = false

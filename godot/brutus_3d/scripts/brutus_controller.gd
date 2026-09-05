@@ -64,8 +64,33 @@ var shield_projectile_reached_end := false
 var shield_trail_timer := 0.0
 var movement_map: TravessiaMap
 var buffered_action: StringName = &""
+var buffered_aim := Vector3.ZERO
 var buffer_left := 0.0
 var last_assist_target: Node3D
+var aim_preview: MeshInstance3D
+var aim_preview_material: StandardMaterial3D
+var aim_preview_kind: StringName = &""
+var aim_preview_direction := Vector3(0, 0, -1)
+var q_contact_done := false
+var q_contact_radius := 1.15
+
+
+func _enemy_within(radius: float) -> bool:
+	for node in get_tree().get_nodes_in_group("damageable"):
+		var candidate := node as Node3D
+		if candidate == null or candidate == self or not candidate.has_method("get_team"):
+			continue
+		if int(candidate.call("get_team")) == get_team():
+			continue
+		if candidate.has_method("is_targetable") and not bool(candidate.call("is_targetable")):
+			continue
+		var actor := candidate as ArenaActor
+		if actor != null and (actor.actor_kind == &"tower" or actor.actor_kind == &"base"):
+			continue
+		if Vector2(global_position.x, global_position.z).distance_to(
+				Vector2(candidate.global_position.x, candidate.global_position.z)) <= radius:
+			return true
+	return false
 
 
 func _ready() -> void:
@@ -99,6 +124,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_update_effects(delta)
 	_update_shield_projectile(delta)
+	_update_aim_preview()
 
 
 func set_virtual_input(next_value: Vector2) -> void:
@@ -129,37 +155,123 @@ func _start_attack() -> void:
 	action_started.emit(&"attack")
 
 
-func request_q() -> void:
+## `aim` is a manual world direction (hold-and-drag or mouse). When zero, the
+## cast is a quick cast: facing direction with soft aim assist.
+func request_q(aim: Vector3 = Vector3.ZERO) -> void:
 	if is_defeated or q_cooldown_left > 0.0:
 		return
 	if not _is_free_for_action() and not _can_cancel_into_ability():
-		_buffer(&"q")
+		_buffer(&"q", aim)
 		return
 	attack_queued = false
-	q_direction = _assisted_direction(last_direction.normalized(),
-		q_assist_range, q_assist_cone_degrees)
+	q_direction = _resolve_cast_direction(aim)
 	last_direction = q_direction
 	q_cooldown_left = q_cooldown
 	q_trail_timer = 0.0
+	q_contact_done = false
 	_begin_action(&"q")
 	animation_player.play(&"q", 0.08)
 	action_started.emit(&"q")
 
 
-func request_r() -> void:
+func request_r(aim: Vector3 = Vector3.ZERO) -> void:
 	if is_defeated or r_cooldown_left > 0.0 or shield_projectile != null:
 		return
 	if not _is_free_for_action() and not _can_cancel_into_ability():
-		_buffer(&"r")
+		_buffer(&"r", aim)
 		return
 	attack_queued = false
-	last_direction = _assisted_direction(last_direction.normalized(),
-		q_assist_range, q_assist_cone_degrees)
+	last_direction = _resolve_cast_direction(aim)
 	r_cooldown_left = r_cooldown
 	r_has_impacted = false
 	_begin_action(&"ultimate")
 	animation_player.play(&"ultimate", 0.10)
 	action_started.emit(&"r")
+
+
+func _resolve_cast_direction(aim: Vector3) -> Vector3:
+	var manual := Vector3(aim.x, 0.0, aim.z)
+	if manual.length_squared() > 0.01:
+		last_assist_target = null
+		return manual.normalized()
+	return _assisted_direction(last_direction.normalized(), q_assist_range, q_assist_cone_degrees)
+
+
+func health_ratio() -> float:
+	return health / maxf(max_health, 1.0)
+
+
+func heal(amount: float) -> void:
+	if is_defeated or amount <= 0.0:
+		return
+	health = minf(max_health, health + amount)
+	health_changed.emit(health, max_health)
+
+
+## Ground indicator drawn while the player holds an ability button. `kind` is
+## &"q" (dash lane) or &"r" (shield line). Hidden with hide_aim_preview().
+func show_aim_preview(kind: StringName, direction: Vector3) -> void:
+	var flat := Vector3(direction.x, 0.0, direction.z)
+	if flat.length_squared() < 0.001:
+		flat = last_direction
+	flat = flat.normalized()
+	if aim_preview == null:
+		aim_preview = MeshInstance3D.new()
+		aim_preview.name = "AimPreview"
+		aim_preview.mesh = PlaneMesh.new()
+		aim_preview_material = StandardMaterial3D.new()
+		aim_preview_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		aim_preview_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		aim_preview_material.no_depth_test = true
+		aim_preview.material_override = aim_preview_material
+		get_parent().add_child(aim_preview)
+	var length := q_dash_speed * 0.5 + 0.6 if kind == &"q" else 5.8
+	var width := 1.1 if kind == &"q" else 0.9
+	(aim_preview.mesh as PlaneMesh).size = Vector2(width, length)
+	aim_preview_material.albedo_color = Color(1.0, 0.62, 0.15, 0.32) if kind == &"q" \
+		else Color(0.8, 0.5, 1.0, 0.32)
+	aim_preview_kind = kind
+	aim_preview_direction = flat
+	aim_preview.visible = true
+	_update_aim_preview()
+
+
+func hide_aim_preview() -> void:
+	aim_preview_kind = &""
+	if aim_preview != null:
+		aim_preview.visible = false
+
+
+func _update_aim_preview() -> void:
+	if aim_preview == null or not aim_preview.visible:
+		return
+	var length := (aim_preview.mesh as PlaneMesh).size.y
+	aim_preview.global_position = global_position + aim_preview_direction * (length * 0.5) \
+		+ Vector3(0, 0.06, 0)
+	aim_preview.rotation.y = atan2(aim_preview_direction.x, aim_preview_direction.z)
+
+
+## World direction from Brutus to the mouse cursor on the ground plane, or
+## zero when there is no camera / the cursor is on top of him.
+func mouse_world_direction() -> Vector3:
+	var viewport := get_viewport()
+	if viewport == null:
+		return Vector3.ZERO
+	var camera := viewport.get_camera_3d()
+	if camera == null:
+		return Vector3.ZERO
+	var mouse := viewport.get_mouse_position()
+	var origin := camera.project_ray_origin(mouse)
+	var normal := camera.project_ray_normal(mouse)
+	if absf(normal.y) < 0.0001:
+		return Vector3.ZERO
+	var t := -origin.y / normal.y
+	if t < 0.0:
+		return Vector3.ZERO
+	var point := origin + normal * t
+	var direction := point - global_position
+	direction.y = 0.0
+	return direction.normalized() if direction.length() > 0.3 else Vector3.ZERO
 
 
 func _is_free_for_action() -> bool:
@@ -173,8 +285,9 @@ func _can_cancel_into_ability() -> bool:
 	return _is_attack_state() and attack_has_impacted
 
 
-func _buffer(kind: StringName) -> void:
+func _buffer(kind: StringName, aim: Vector3 = Vector3.ZERO) -> void:
 	buffered_action = kind
+	buffered_aim = aim
 	buffer_left = input_buffer_time
 
 
@@ -182,15 +295,17 @@ func _flush_buffer() -> void:
 	if buffered_action.is_empty():
 		return
 	var kind := buffered_action
+	var aim := buffered_aim
 	buffered_action = &""
+	buffered_aim = Vector3.ZERO
 	buffer_left = 0.0
 	match kind:
 		&"attack":
 			request_attack()
 		&"q":
-			request_q()
+			request_q(aim)
 		&"r":
-			request_r()
+			request_r(aim)
 
 
 ## Returns the direction toward the best enemy within range and cone, or the
@@ -247,9 +362,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("attack"):
 		request_attack()
 	elif event.is_action_pressed("ability_q"):
-		request_q()
+		# Keyboard: aim at the mouse cursor like the HTML build; fall back to
+		# quick cast with assist when the cursor is unavailable.
+		request_q(mouse_world_direction())
 	elif event.is_action_pressed("ability_r"):
-		request_r()
+		request_r(mouse_world_direction())
 
 
 func _physics_process(delta: float) -> void:
@@ -441,6 +558,11 @@ func _process_charge(delta: float) -> void:
 	if action_elapsed >= 0.20 and action_elapsed <= 0.70:
 		velocity.x = q_direction.x * q_dash_speed
 		velocity.z = q_direction.z * q_dash_speed
+		# Charging through an enemy connects on contact; the shield does not
+		# wait for the end of the run to knock people over.
+		if not q_contact_done and _enemy_within(q_contact_radius):
+			q_contact_done = true
+			ability_impact.emit(&"q", global_position)
 		q_trail_timer -= delta
 		if q_trail_timer <= 0.0:
 			q_trail_timer = 0.075

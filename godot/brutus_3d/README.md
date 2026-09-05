@@ -31,6 +31,13 @@ final é este projeto Godot e não precisa reproduzir as limitações visuais do
   hitstop, tremor proporcional, números de dano, vinheta de dano, atordoamento
   da Investida, lentidão do Escudo e catorze efeitos sonoros sintéticos
   (tecla M silencia). Ver `docs/GAME_FEEL.md`.
+- Controles touch de MOBA: tap = quick cast, segurar e arrastar = mira manual
+  com prévia no chão, joystick flutuante, recarga radial nos botões.
+- Kits completos de Lyra, Nix e Sol (Q e R, projéteis e zonas reutilizáveis)
+  e IA que recua, usa a fonte, contesta o dragão, evita mergulhar em torre e
+  troca de lane. Minions andam em coluna e trocam golpes de forma justa.
+- Dragão com buff temporário (+30% por 45 s) e waves reforçadas; desempate em
+  cascata legível no HUD. Ver `docs/MATCH_FLOW.md`.
 
 ## Como executar
 
@@ -61,6 +68,9 @@ godot --path godot/brutus_3d
 - `tools/inspect_roster_family.gd`: valida malhas e contratos de clips do elenco.
 - `tools/test_abilities.gd`: executa automaticamente Investida e Escudo Bumerangue e valida seus estados.
 - `tools/test_game_feel.gd`: valida mira assistida, buffer, controle de grupo, hitstop, feedback e áudio.
+- `tools/test_roster_kits.gd`: valida os kits de Lyra, Nix e Sol, a IA dos bots, a navegação, os minions em coluna, o desempate e os botões touch.
+- `tools/validate_match.gd`: partida completa de 3 minutos com Brutus automático, com linha do tempo e resumo.
+- `docs/MATCH_FLOW.md`: como bots, minions, dragão e desempate funcionam agora.
 - `scripts/data/travessia_definition.gd`: fonte canônica das posições e regras do mapa.
 - `scripts/travessia_map.gd`: apresentação jogável alinhada à arte aprovada da Travessia.
 - `assets/maps/travessia_clean_v1.png`: referência artística original preservada.

@@ -5,9 +5,9 @@ extends Node3D
 @onready var camera: Camera3D = $CameraRig/Camera3D
 @onready var joystick: FreneticJoystick = $HUD/VirtualJoystick
 @onready var speed_label: Label = $HUD/Speed
-@onready var attack_button: Button = $HUD/AttackButton
-@onready var q_button: Button = $HUD/QButton
-@onready var r_button: Button = $HUD/RButton
+@onready var attack_button: AbilityButton = $HUD/AttackButton
+@onready var q_button: AbilityButton = $HUD/QButton
+@onready var r_button: AbilityButton = $HUD/RButton
 @onready var title_label: Label = $HUD/Title
 @onready var hint_label: Label = $HUD/Hint
 
@@ -34,8 +34,14 @@ var team_kills := [0, 0]
 var team_towers_destroyed := [0, 0]
 var team_damage_multiplier := {0: 1.0, 1: 1.0}
 var dragon_slain_by := -1
+var dragon_buff_left := 0.0
+var dragon_buff_team := -1
+var reinforced_waves_left := [0, 0]
+var wave_index := 0
 var feedback: CombatFeedback
 var sfx: ArenaSfx
+var advantage_label: Label
+var charge_hit_ids: Array = []
 var last_brutus_health := -1.0
 @export var follow_player_camera := false
 
@@ -48,6 +54,7 @@ func _ready() -> void:
 	sfx = ArenaSfx.new()
 	add_child(sfx)
 	feedback = CombatFeedback.new()
+	feedback.add_to_group("combat_feedback")
 	add_child(feedback)
 	feedback.setup(self, $HUD)
 	_build_match()
@@ -55,9 +62,9 @@ func _ready() -> void:
 	brutus.last_direction = Vector3(0, 0, -1)
 	camera_rest_position = camera.position
 	joystick.vector_changed.connect(brutus.set_virtual_input)
-	attack_button.pressed.connect(brutus.request_attack)
-	q_button.pressed.connect(brutus.request_q)
-	r_button.pressed.connect(brutus.request_r)
+	attack_button.quick_cast.connect(brutus.request_attack)
+	_wire_aim_button(q_button, &"q")
+	_wire_aim_button(r_button, &"r")
 	brutus.ability_impact.connect(_on_ability_impact)
 	brutus.action_started.connect(_on_brutus_action_started)
 	brutus.shield_returned.connect(func() -> void: sfx.play(&"r_catch", -3.0))
@@ -78,8 +85,9 @@ func _process(delta: float) -> void:
 		roundi(brutus.speed_ratio * 100.0),
 		roundi(float(match_rules.get("game_speed", 1.0)) * 100.0),
 	]
-	_update_ability_button(q_button, "Q", brutus.q_cooldown_left)
-	_update_ability_button(r_button, "R", brutus.r_cooldown_left)
+	_update_ability_button(q_button, brutus.q_cooldown_left, brutus.q_cooldown)
+	_update_ability_button(r_button, brutus.r_cooldown_left, brutus.r_cooldown)
+	_update_ability_button(attack_button, 0.0, 1.0)
 	_update_camera_shake(delta)
 	if not match_over:
 		match_time += real_delta
@@ -93,7 +101,63 @@ func _process(delta: float) -> void:
 		if wave_timer <= 0.0:
 			wave_timer = float(match_rules.wave_interval)
 			_spawn_wave()
+		_tick_dragon_buff(real_delta)
+		_apply_player_fountain(delta)
 	_update_match_label()
+
+
+## Fast regeneration next to the allied main tower, like the HTML fountain.
+func _apply_player_fountain(delta: float) -> void:
+	if brutus.is_defeated or brutus.health >= brutus.max_health:
+		return
+	var core_reference = team_bases.get(0)
+	if not is_instance_valid(core_reference):
+		return
+	var core := core_reference as ArenaActor
+	if CombatWorld.planar(brutus, core) <= float(match_rules.fountain_radius):
+		brutus.heal(brutus.max_health * float(match_rules.fountain_heal_pct_per_second) * delta)
+
+
+func _tick_dragon_buff(real_delta: float) -> void:
+	if dragon_buff_team < 0:
+		return
+	dragon_buff_left -= real_delta
+	if dragon_buff_left > 0.0:
+		return
+	_end_dragon_buff()
+
+
+func _end_dragon_buff() -> void:
+	var team := dragon_buff_team
+	dragon_buff_team = -1
+	dragon_buff_left = 0.0
+	if team < 0:
+		return
+	team_damage_multiplier[team] = 1.0
+	for hero in hero_bots:
+		if is_instance_valid(hero) and hero.team == team:
+			hero.damage_multiplier = 1.0
+	for node in get_tree().get_nodes_in_group("arena_actors"):
+		var actor := node as ArenaActor
+		if actor != null and actor.actor_kind == &"minion" and actor.team == team \
+				and actor.has_meta("dragon_boosted"):
+			actor.attack_damage /= float(actor.get_meta("dragon_boosted"))
+			actor.remove_meta("dragon_boosted")
+	status_label.text = "BUFF DO DRAGÃO ACABOU"
+	_get_tree_timer_clear_status()
+
+
+func _wire_aim_button(button: AbilityButton, kind: StringName) -> void:
+	var caster := brutus.request_q if kind == &"q" else brutus.request_r
+	button.quick_cast.connect(func() -> void: caster.call(Vector3.ZERO))
+	button.aim_started.connect(func() -> void:
+		brutus.show_aim_preview(kind, brutus.last_direction))
+	button.aim_changed.connect(func(direction: Vector2) -> void:
+		brutus.show_aim_preview(kind, Vector3(direction.x, 0.0, direction.y)))
+	button.aim_cancelled.connect(brutus.hide_aim_preview)
+	button.aim_cast.connect(func(direction: Vector2) -> void:
+		brutus.hide_aim_preview()
+		caster.call(Vector3(direction.x, 0.0, direction.y)))
 
 
 func _exit_tree() -> void:
@@ -101,18 +165,19 @@ func _exit_tree() -> void:
 	if is_equal_approx(Engine.time_scale, float(match_rules.get("game_speed", 1.0))):
 		Engine.time_scale = 1.0
 
-func _update_ability_button(button: Button, ready_text: String, cooldown: float) -> void:
+func _update_ability_button(button: AbilityButton, cooldown: float, total: float) -> void:
 	if match_over:
 		button.disabled = true
 		return
 	button.disabled = cooldown > 0.0
-	button.text = "%s\n%.1f s" % [ready_text.left(1), cooldown] if cooldown > 0.0 else ready_text
+	button.set_cooldown(cooldown, total)
 
 func _on_brutus_action_started(kind: StringName) -> void:
 	match kind:
 		&"attack":
 			sfx.play(&"swing", -6.0, 0.12)
 		&"q":
+			charge_hit_ids = []
 			sfx.play(&"q_charge", -4.0)
 		&"r":
 			sfx.play(&"r_throw", -2.0)
@@ -139,7 +204,11 @@ func _on_ability_impact(kind: StringName, world_position: Vector3) -> void:
 		shake_time = 0.38
 		shake_strength = 0.24
 		hit_clip = &"r_impact"
-	var hits := _damage_enemies(world_position, radius, damage)
+	var hits := _damage_enemies(world_position, radius, damage,
+		charge_hit_ids if kind == &"q" else [])
+	if kind == &"q":
+		for target in hits:
+			charge_hit_ids.append(target.get_instance_id())
 	if hits.is_empty():
 		# A whiff still shakes a little so the swing reads, but never freezes.
 		camera_shake_left = shake_time * 0.4
@@ -241,17 +310,33 @@ func _spawn_actor(data: Dictionary, at_position: Vector3) -> ArenaActor:
 func _spawn_wave() -> void:
 	if match_over or get_tree().get_nodes_in_group("arena_actors").size() > int(match_rules.max_actors):
 		return
+	# Alternate which team is instantiated first so scene-tree order never
+	# gives one side a permanent first-strike edge.
+	wave_index += 1
+	var team_order: Array = [0, 1] if wave_index % 2 == 1 else [1, 0]
 	for lane_x in TravessiaDefinition.LANE_X:
-		for team in [0, 1]:
+		for team in team_order:
 			if _lane_minion_count(team, lane_x) \
 					< int(match_rules.max_minions_per_lane):
 				_spawn_minion(team, lane_x)
+	for team in [0, 1]:
+		if reinforced_waves_left[team] > 0:
+			reinforced_waves_left[team] -= 1
 
 
-func _spawn_minion(team: int, lane_x: float) -> void:
+func _spawn_minion(team: int, lane_x: float) -> ArenaActor:
 	var data := TravessiaDefinition.minion(team, lane_x)
+	if reinforced_waves_left[team] > 0:
+		var multiplier := float(match_rules.reinforced_wave_multiplier)
+		data.health = float(data.health) * multiplier
+		data.attack_damage = float(data.attack_damage) * multiplier
+		data["reinforced"] = true
 	var actor := _spawn_actor(data, data.position)
-	actor.attack_damage *= float(team_damage_multiplier.get(team, 1.0))
+	var bonus := float(team_damage_multiplier.get(team, 1.0))
+	if bonus > 1.0:
+		actor.attack_damage *= bonus
+		actor.set_meta("dragon_boosted", bonus)
+	return actor
 
 
 func _lane_minion_count(team: int, lane_x: float) -> int:
@@ -292,14 +377,31 @@ func _hatch_dragon() -> void:
 func _finish_by_time() -> void:
 	if match_over:
 		return
-	var allied_score := _team_score(0)
-	var enemy_score := _team_score(1)
-	var winner := -1
-	if allied_score > enemy_score + 0.1:
-		winner = 0
-	elif enemy_score > allied_score + 0.1:
-		winner = 1
-	_finish_match(winner, "tempo")
+	var verdict := _team_advantage()
+	_finish_match(int(verdict.winner), "tempo esgotado: %s" % String(verdict.reason))
+
+
+## Readable tiebreak, in order: towers destroyed, main tower health, kills,
+## dragon. Returns {winner: -1/0/1, reason: String, stage: StringName}.
+func _team_advantage() -> Dictionary:
+	if team_towers_destroyed[0] != team_towers_destroyed[1]:
+		var winner := 0 if team_towers_destroyed[0] > team_towers_destroyed[1] else 1
+		return {"winner": winner, "stage": &"towers",
+			"reason": "mais torres destruídas (%d × %d)" % [
+				team_towers_destroyed[0], team_towers_destroyed[1]]}
+	var blue_core := _base_health(0)
+	var red_core := _base_health(1)
+	if absf(blue_core - red_core) > 1.0:
+		var winner := 0 if blue_core > red_core else 1
+		return {"winner": winner, "stage": &"core",
+			"reason": "torre principal com mais vida (%d × %d)" % [roundi(blue_core), roundi(red_core)]}
+	if team_kills[0] != team_kills[1]:
+		var winner := 0 if team_kills[0] > team_kills[1] else 1
+		return {"winner": winner, "stage": &"kills",
+			"reason": "mais abates (%d × %d)" % [team_kills[0], team_kills[1]]}
+	if dragon_slain_by >= 0:
+		return {"winner": dragon_slain_by, "stage": &"dragon", "reason": "dragão derrotado"}
+	return {"winner": -1, "stage": &"tie", "reason": "empate total"}
 
 
 func _base_health(team: int) -> float:
@@ -323,7 +425,8 @@ func _team_score(team: int) -> float:
 
 
 ## Applies Brutus damage around `center`; returns the nodes that were hit.
-func _damage_enemies(center: Vector3, radius: float, damage: float) -> Array:
+## `skip_ids` lists instance ids already hit by the same cast (charge contact).
+func _damage_enemies(center: Vector3, radius: float, damage: float, skip_ids: Array = []) -> Array:
 	var hits: Array = []
 	if match_over:
 		return hits
@@ -331,6 +434,8 @@ func _damage_enemies(center: Vector3, radius: float, damage: float) -> Array:
 	for node in get_tree().get_nodes_in_group("damageable"):
 		var target := node as Node3D
 		if target == null or target == brutus or not target.has_method("get_team"):
+			continue
+		if skip_ids.has(target.get_instance_id()):
 			continue
 		if int(target.call("get_team")) == brutus.get_team():
 			continue
@@ -374,13 +479,18 @@ func _apply_dragon_reward(team: int) -> void:
 		_get_tree_timer_clear_status()
 		return
 	dragon_slain_by = team
+	if dragon_buff_team >= 0:
+		_end_dragon_buff()
 	var bonus := float(match_rules.dragon_team_damage_bonus)
 	team_damage_multiplier[team] = bonus
+	dragon_buff_team = team
+	dragon_buff_left = float(match_rules.dragon_buff_duration)
+	reinforced_waves_left[team] = int(match_rules.dragon_reinforced_waves)
 	if team == 0 and not brutus.is_defeated:
 		brutus.health = minf(brutus.max_health, brutus.health + 420.0)
 		brutus.health_changed.emit(brutus.health, brutus.max_health)
 	for hero in hero_bots:
-		if hero.team != team:
+		if not is_instance_valid(hero) or hero.team != team:
 			continue
 		hero.damage_multiplier = bonus
 		if not hero.is_defeated:
@@ -388,10 +498,12 @@ func _apply_dragon_reward(team: int) -> void:
 			hero.call("_update_health_bar")
 	for node in get_tree().get_nodes_in_group("arena_actors"):
 		var actor := node as ArenaActor
-		if actor != null and actor.actor_kind == &"minion" and actor.team == team:
+		if actor != null and actor.actor_kind == &"minion" and actor.team == team \
+				and not actor.has_meta("dragon_boosted"):
 			actor.attack_damage *= bonus
+			actor.set_meta("dragon_boosted", bonus)
 	var team_name := "AZUL" if team == 0 else "VERMELHA"
-	status_label.text = "DRAGÃO DERROTADO — EQUIPE %s FORTALECIDA" % team_name
+	status_label.text = "DRAGÃO DERROTADO — EQUIPE %s +30%% POR 45 s" % team_name
 	_get_tree_timer_clear_status()
 
 
@@ -500,9 +612,10 @@ func _show_end_overlay(title: String, reason: String, color: Color) -> void:
 		return
 	end_title.text = title
 	end_title.add_theme_color_override("font_color", color)
-	end_summary.text = "%s\nTorres: %d × %d   Abates: %d × %d%s" % [
+	end_summary.text = "%s\nTorres destruídas: %d × %d   Abates: %d × %d\nTorre principal: %d%% × %d%%%s" % [
 		reason.capitalize(), team_towers_destroyed[0], team_towers_destroyed[1],
 		team_kills[0], team_kills[1],
+		roundi(_base_health(0) / 42.0), roundi(_base_health(1) / 42.0),
 		"   Dragão: Azul" if dragon_slain_by == 0 else (
 			"   Dragão: Vermelho" if dragon_slain_by == 1 else "")]
 	end_overlay.visible = true
@@ -517,9 +630,10 @@ func _build_match_hud() -> void:
 	title_label.visible = false
 	hint_label.visible = false
 	speed_label.visible = false
-	attack_button.text = "ATQ"
-	q_button.text = "Q"
-	r_button.text = "R"
+	for pair in [[attack_button, "ATQ"], [q_button, "Q"], [r_button, "R"]]:
+		var button := pair[0] as AbilityButton
+		button.text = pair[1]
+		button.ready_text = pair[1]
 	var prototype_label := $HUD.get_node_or_null("Prototype") as Label
 	if prototype_label != null:
 		prototype_label.visible = false
@@ -529,20 +643,30 @@ func _build_match_hud() -> void:
 	match_label = Label.new()
 	match_label.name = "MatchStatus"
 	match_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	match_label.offset_top = 46.0
-	match_label.offset_bottom = 72.0
+	match_label.offset_top = 44.0
+	match_label.offset_bottom = 70.0
 	match_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	match_label.add_theme_font_size_override("font_size", 16)
 	match_label.add_theme_color_override("font_color", Color("eef6e9"))
 	$HUD.add_child(match_label)
 
+	advantage_label = Label.new()
+	advantage_label.name = "Advantage"
+	advantage_label.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	advantage_label.offset_top = 70.0
+	advantage_label.offset_bottom = 92.0
+	advantage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	advantage_label.add_theme_font_size_override("font_size", 13)
+	advantage_label.add_theme_color_override("font_color", Color("cfe3cc"))
+	$HUD.add_child(advantage_label)
+
 	status_label = Label.new()
 	status_label.name = "Announcement"
 	status_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	status_label.offset_left = -260.0
-	status_label.offset_top = 76.0
+	status_label.offset_top = 96.0
 	status_label.offset_right = 260.0
-	status_label.offset_bottom = 118.0
+	status_label.offset_bottom = 138.0
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.add_theme_font_size_override("font_size", 20)
 	status_label.add_theme_color_override("font_color", Color("ffd45a"))
@@ -644,16 +768,29 @@ func _update_match_label() -> void:
 	var total_seconds := ceili(remaining)
 	var minutes := total_seconds / 60
 	var seconds := total_seconds % 60
-	var enemy_health := 0
-	var enemy_base_reference = team_bases.get(1)
-	if is_instance_valid(enemy_base_reference):
-		var enemy_base := enemy_base_reference as ArenaActor
-		enemy_health = roundi(enemy_base.health)
+	var blue_core_pct := roundi(_base_health(0) / 42.0)
+	var red_core_pct := roundi(_base_health(1) / 42.0)
 	var blue_towers := _standing_towers(0)
 	var red_towers := _standing_towers(1)
-	match_label.text = "AZUL %dT  |  %02d:%02d  |  %dT VERMELHO  •  CORE %d  •  %s" % [
-		blue_towers, minutes, seconds, red_towers, enemy_health,
-		"DRAGÃO" if dragon_hatched else "OVO"]
+	match_label.text = "AZUL  %dT  ♥%d%%   |   %02d:%02d   |   ♥%d%%  %dT  VERMELHO" % [
+		blue_towers, blue_core_pct, minutes, seconds, red_core_pct, red_towers]
+	if advantage_label == null:
+		return
+	var verdict := _team_advantage()
+	var advantage_text := "EMPATE — decide: torres, vida da torre principal, abates"
+	if int(verdict.winner) == 0:
+		advantage_text = "VANTAGEM AZUL — %s" % String(verdict.reason)
+	elif int(verdict.winner) == 1:
+		advantage_text = "VANTAGEM VERMELHA — %s" % String(verdict.reason)
+	if dragon_buff_team >= 0:
+		advantage_text += "   •   DRAGÃO %s +30%% %ds" % [
+			"AZUL" if dragon_buff_team == 0 else "VERMELHO", ceili(dragon_buff_left)]
+	elif not dragon_hatched:
+		advantage_text += "   •   OVO"
+	advantage_label.text = advantage_text
+	advantage_label.add_theme_color_override("font_color",
+		Color("9fdcff") if int(verdict.winner) == 0 else (
+			Color("ffa3ae") if int(verdict.winner) == 1 else Color("cfe3cc")))
 
 
 func _standing_towers(team: int) -> int:

@@ -34,6 +34,12 @@ func _capture() -> void:
 	for _frame in range(48):
 		await physics_frame
 	brutus.take_damage(260.0)
+	# Show the manual-aim preview, a radial cooldown and the advantage line.
+	brutus.show_aim_preview(&"r", Vector3(0.4, 0.0, -1.0))
+	var r_button := game.get_node("HUD/RButton") as AbilityButton
+	r_button.call("_press", 1, Vector2(50, 50))
+	r_button.call("_drag", Vector2(90, -60))
+	game.team_towers_destroyed = [1, 0]
 	await process_frame
 	await process_frame
 	var image := root.get_texture().get_image()

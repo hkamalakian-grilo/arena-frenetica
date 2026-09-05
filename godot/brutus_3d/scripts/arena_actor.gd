@@ -5,6 +5,12 @@ signal health_changed(current: float, maximum: float)
 signal defeated(actor: ArenaActor)
 
 const MINION_UNIT_AGGRO_RANGE := 4.5
+## Allied minions keep this much lane distance so a wave forms a column
+## instead of one stacked pile that hits a single enemy four times at once.
+const MINION_COLUMN_SPACING := 0.62
+## Melee minion hits land after a short swing so simultaneous trades resolve
+## fairly regardless of scene-tree processing order.
+const MINION_HIT_DELAY := 0.28
 const DRAGON_3D_SCENE := preload("res://assets/dragon/dragon_3d.glb")
 const DRAGON_EGG_3D_SCENE := preload("res://assets/dragon/dragon_egg_3d.glb")
 
@@ -26,6 +32,7 @@ var stun_left := 0.0
 var slow_left := 0.0
 var slow_factor := 1.0
 var stun_marker: MeshInstance3D
+var is_reinforced := false
 
 var health_fill: MeshInstance3D
 var health_backdrop: MeshInstance3D
@@ -50,6 +57,7 @@ func configure(data: Dictionary) -> void:
 	attack_interval = data.get("attack_interval", 1.0)
 	lane_x = data.get("lane_x", global_position.x)
 	body_color = data.get("color", Color.WHITE)
+	is_reinforced = data.get("reinforced", false)
 	name = "%s_Team%d" % [String(actor_kind).capitalize(), team]
 	add_to_group("arena_actors")
 	if actor_kind != &"dragon_egg":
@@ -58,6 +66,20 @@ func configure(data: Dictionary) -> void:
 	collision_mask = 1
 	_build_visual()
 	_build_collision()
+	if is_reinforced and actor_model != null:
+		actor_model.model_root.scale *= 1.18
+
+
+func health_ratio() -> float:
+	return health / maxf(max_health, 1.0)
+
+
+func heal(amount: float) -> void:
+	if is_defeated or amount <= 0.0 or actor_kind == &"dragon_egg":
+		return
+	health = minf(max_health, health + amount)
+	_update_health_bar()
+	health_changed.emit(health, max_health)
 
 
 func get_team() -> int:
@@ -214,18 +236,61 @@ func _process_minion() -> void:
 	if absf(z_distance) > attack_range:
 		# Canonical lane rule: no chasing, curves or lateral combat movement.
 		global_position.x = lane_x
-		velocity = Vector3(0.0, 0.0, signf(z_distance) * _current_move_speed())
+		var advance := signf(z_distance)
+		if _ally_blocking_column(advance):
+			velocity = Vector3.ZERO
+			return
+		velocity = Vector3(0.0, 0.0, advance * _current_move_speed())
 		move_and_slide()
 	else:
 		velocity = Vector3.ZERO
 		_try_attack(objective)
 
 
+## True when an allied minion of this lane stands just ahead in the direction
+## of travel. The follower waits, so the wave advances as a column.
+func _ally_blocking_column(advance: float) -> bool:
+	for node in get_tree().get_nodes_in_group("arena_actors"):
+		var ally := node as ArenaActor
+		if ally == null or ally == self or ally.is_defeated or ally.team != team \
+				or ally.actor_kind != &"minion" or absf(ally.lane_x - lane_x) > 0.1:
+			continue
+		var gap := (ally.global_position.z - global_position.z) * advance
+		if gap > 0.0 and gap < MINION_COLUMN_SPACING:
+			return true
+	return false
+
+
 func _process_guardian() -> void:
 	if not _valid_target(objective) or _planar_distance(objective) > attack_range:
+		objective = null
+	if actor_kind == &"tower":
+		# Classic tower aggro: minions absorb the fire first, so a hero can
+		# push with a wave; once the wave is gone, the hero takes the shots.
+		var current := objective as ArenaActor
+		if current == null or current.actor_kind != &"minion":
+			var minion := _find_nearest_enemy_minion(attack_range)
+			if minion != null:
+				objective = minion
+	if objective == null:
 		objective = _find_nearest_enemy(attack_range)
 	if objective != null:
 		_try_attack(objective)
+
+
+func _find_nearest_enemy_minion(max_distance: float) -> Node3D:
+	var closest: Node3D
+	var closest_distance := max_distance
+	for node in get_tree().get_nodes_in_group("arena_actors"):
+		var actor := node as ArenaActor
+		if actor == null or actor == self or actor.actor_kind != &"minion" \
+				or actor.team == team or not _valid_target(actor):
+			continue
+		var distance := _planar_distance(actor)
+		if distance < closest_distance:
+			closest_distance = distance
+			closest = actor
+	return closest
 
 
 func _try_attack(target: Node3D) -> void:
@@ -247,8 +312,20 @@ func _try_attack(target: Node3D) -> void:
 	if actor_kind == &"tower":
 		get_tree().call_group("arena_sfx", "play", &"tower_shot", -8.0, 0.08)
 		_launch_tower_projectile(target)
+	elif actor_kind == &"minion":
+		_schedule_melee_hit(target, attack_damage, team)
 	else:
 		target.call("take_damage", attack_damage, team)
+
+
+## The hit resolves after the swing even if this minion dies meanwhile, so two
+## minions trading blows both connect instead of the first-processed winning.
+func _schedule_melee_hit(target: Node3D, amount: float, source_team: int) -> void:
+	var timer := get_tree().create_timer(MINION_HIT_DELAY, false)
+	timer.timeout.connect(func() -> void:
+		if is_instance_valid(target) and target.has_method("is_targetable") \
+				and bool(target.call("is_targetable")):
+			target.call("take_damage", amount, source_team))
 
 
 func _launch_tower_projectile(target: Node3D) -> void:

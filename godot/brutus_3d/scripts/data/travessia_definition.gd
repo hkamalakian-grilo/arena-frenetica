@@ -19,7 +19,7 @@ const WALKABLE_RECTS := [
 	{"name": &"left_north_road", "center": Vector2(-5.35, -7.85),
 		"half_extents": Vector2(1.35, 6.85)},
 	{"name": &"left_bridge", "center": Vector2(-5.35, 0.0),
-		"half_extents": Vector2(0.82, 1.85)},
+		"half_extents": Vector2(1.15, 1.85)},
 	{"name": &"left_south_road", "center": Vector2(-5.35, 7.85),
 		"half_extents": Vector2(1.35, 6.85)},
 	{"name": &"left_north_jungle_side", "center": Vector2(-3.90, -7.50),
@@ -27,7 +27,7 @@ const WALKABLE_RECTS := [
 	{"name": &"right_north_road", "center": Vector2(5.35, -7.85),
 		"half_extents": Vector2(1.35, 6.85)},
 	{"name": &"right_bridge", "center": Vector2(5.35, 0.0),
-		"half_extents": Vector2(0.82, 1.85)},
+		"half_extents": Vector2(1.15, 1.85)},
 	{"name": &"right_south_road", "center": Vector2(5.35, 7.85),
 		"half_extents": Vector2(1.35, 6.85)},
 	{"name": &"north_center_path", "center": Vector2(0.0, -7.10),
@@ -207,8 +207,74 @@ static func match_rules() -> Dictionary:
 		"max_actors": 38,
 		"max_minions_per_lane": 4,
 		"respawn_time": 3.0,
-		"dragon_team_damage_bonus": 1.12,
+		# Dragon reward (GAME_DESIGN / README): +30% damage for 45 s and the
+		# next two waves of that team spawn reinforced.
+		"dragon_team_damage_bonus": 1.30,
+		"dragon_buff_duration": 45.0,
+		"dragon_reinforced_waves": 2,
+		"reinforced_wave_multiplier": 1.5,
+		# Fountain: fast regeneration next to the own main tower.
+		"fountain_radius": 3.2,
+		"fountain_heal_pct_per_second": 0.08,
+		# Bot decision thresholds (mirrors src/config/balance.js `bots`).
+		"bot_retreat_hp_pct": 0.30,
+		"bot_retreat_exit_hp_pct": 0.55,
+		"bot_dragon_min_hp_pct": 0.50,
+		"bot_rotate_empty_lane_seconds": 4.0,
+		"bot_dive_min_hp_pct": 0.60,
+		"tower_attack_range": 4.5,
 	}
+
+
+## Waypoint graph used by hero bots to travel between lanes, bases and the
+## dragon island without pushing against jungle or water. Positions sit inside
+## WALKABLE_RECTS / ELLIPSES; edges follow the painted stone openings.
+static func nav_waypoints() -> Dictionary:
+	return {
+		&"blue_core": Vector2(0.0, 11.4),
+		&"red_core": Vector2(0.0, -11.4),
+		&"south_left_junction": Vector2(-3.30, 10.95),
+		&"south_right_junction": Vector2(3.30, 10.95),
+		&"north_left_junction": Vector2(-3.30, -10.95),
+		&"north_right_junction": Vector2(3.30, -10.95),
+		# Lane ends sit inside the overlap of the road and the base junction so
+		# every edge stays walkable for a 0.42 body radius.
+		&"left_south_lane": Vector2(-5.0, 9.6),
+		&"left_bridge": Vector2(-5.35, 0.0),
+		&"left_north_lane": Vector2(-5.0, -9.6),
+		&"right_south_lane": Vector2(5.0, 9.6),
+		&"right_bridge": Vector2(5.35, 0.0),
+		&"right_north_lane": Vector2(5.0, -9.6),
+		&"south_center": Vector2(0.0, 7.1),
+		&"north_center": Vector2(0.0, -7.1),
+		&"south_center_gate": Vector2(0.0, 4.2),
+		&"north_center_gate": Vector2(0.0, -4.2),
+		&"south_dragon_bridge": Vector2(0.0, 2.6),
+		&"north_dragon_bridge": Vector2(0.0, -2.6),
+		&"dragon_island": Vector2(0.0, 0.0),
+	}
+
+
+static func nav_edges() -> Array:
+	return [
+		[&"blue_core", &"south_left_junction"], [&"blue_core", &"south_right_junction"],
+		[&"blue_core", &"south_center"],
+		[&"south_left_junction", &"left_south_lane"], [&"south_right_junction", &"right_south_lane"],
+		[&"left_south_lane", &"left_bridge"], [&"left_bridge", &"left_north_lane"],
+		[&"right_south_lane", &"right_bridge"], [&"right_bridge", &"right_north_lane"],
+		[&"red_core", &"north_left_junction"], [&"red_core", &"north_right_junction"],
+		[&"red_core", &"north_center"],
+		[&"north_left_junction", &"left_north_lane"], [&"north_right_junction", &"right_north_lane"],
+		[&"south_center", &"south_center_gate"], [&"north_center", &"north_center_gate"],
+	]
+
+
+## Edges that only exist once the dragon bridges have finished assembling.
+static func nav_dragon_edges() -> Array:
+	return [
+		[&"south_center_gate", &"south_dragon_bridge"], [&"south_dragon_bridge", &"dragon_island"],
+		[&"north_center_gate", &"north_dragon_bridge"], [&"north_dragon_bridge", &"dragon_island"],
+	]
 
 
 static func palette() -> Dictionary:
@@ -271,7 +337,9 @@ static func structures() -> Array[Dictionary]:
 			"kind": &"tower",
 			"team": marker.team,
 			"position": marker.position,
-			"health": 1500.0,
+			# HTML lane tower on map C is 1150. One wave plus one hero must be
+			# able to finish a tower; towers shoot minions before heroes.
+			"health": 1100.0,
 			"color": Color("37bfe8") if marker.team == 0 else Color("ef5268"),
 		})
 	return result
@@ -319,8 +387,10 @@ static func dragon_definition() -> Dictionary:
 		"kind": &"dragon",
 		"team": 2,
 		"position": Vector3.ZERO,
-		"health": 2200.0,
-		"attack_damage": 85.0,
+		# HTML values: a 2v2 fight must be able to finish the dragon in the
+		# last minute instead of trading retreats until the clock ends.
+		"health": 1400.0,
+		"attack_damage": 70.0,
 		"attack_range": 3.4,
 		"attack_interval": 1.15,
 		"color": Color("9c55cc"),
@@ -334,20 +404,50 @@ static func hero_bots() -> Array[Dictionary]:
 			"position": Vector3(1.5, 0, 12.2), "health": 700.0,
 			"move_speed": 2.35, "attack_damage": 62.0, "attack_range": 3.0,
 			"attack_interval": 0.8, "texture": "res://assets/heroes/sol.png",
+			"ranged": true, "projectile_speed": 8.8,
 		},
 		{
 			"hero": &"lyra", "name": "Lyra", "team": 1, "lane_x": LANE_X[0],
 			"position": Vector3(-1.5, 0, -12.2), "health": 750.0,
 			"move_speed": 2.45, "attack_damage": 72.0, "attack_range": 3.05,
 			"attack_interval": 0.75, "texture": "res://assets/heroes/lyra.png",
+			"ranged": true, "projectile_speed": 9.5,
 		},
 		{
 			"hero": &"nix", "name": "Nix", "team": 1, "lane_x": LANE_X[1],
 			"position": Vector3(1.5, 0, -12.2), "health": 800.0,
 			"move_speed": 2.6, "attack_damage": 90.0, "attack_range": 1.2,
 			"attack_interval": 0.62, "texture": "res://assets/heroes/nix.png",
+			"ranged": false,
 		},
 	]
+
+
+## Q / R kits for the roster bots. Values follow src/config/balance.js with
+## 100 prototype units = 1 Godot unit; times in seconds of simulation.
+static func hero_kits() -> Dictionary:
+	return {
+		&"lyra": {
+			"q": {"name": "Flecha Perfurante", "cooldown": 6.0, "damage": 120.0,
+				"range": 6.0, "width": 0.32, "speed": 9.8, "pierce": true},
+			"r": {"name": "Chuva de Flechas", "cooldown": 40.0, "damage_per_second": 60.0,
+				"duration": 3.0, "radius": 2.0, "cast_range": 5.0, "slow": 0.75,
+				"tick": 0.5, "delay": 0.55},
+		},
+		&"nix": {
+			"q": {"name": "Passo Sombrio", "cooldown": 8.0, "blink": 3.0,
+				"bonus_damage": 100.0, "bonus_window": 3.0},
+			"r": {"name": "Execução", "cooldown": 50.0, "damage": 280.0,
+				"execute_hp_pct": 0.35, "range": 4.5, "dash_speed": 5.5},
+		},
+		&"sol": {
+			"q": {"name": "Orbe Solar", "cooldown": 7.0, "damage": 100.0, "heal": 140.0,
+				"range": 5.6, "width": 0.34, "speed": 8.4, "pierce": false},
+			"r": {"name": "Zona Radiante", "cooldown": 45.0, "radius": 2.2, "duration": 4.0,
+				"cast_range": 4.5, "heal_per_second": 40.0, "haste": 0.2, "tick": 0.5,
+				"delay": 0.4},
+		},
+	}
 
 
 static func minion(team: int, lane_x: float) -> Dictionary:

@@ -92,7 +92,8 @@ func _run() -> void:
 	brutus.request_q()
 	for _frame in range(70):
 		await physics_frame
-	assert(brutus.global_position.x < -4.80,
+	# The physical bridge now spans the painted stone (half width 1.15).
+	assert(brutus.global_position.x < -4.50,
 		"Brutus charge escaped from the side of the western bridge")
 	assert(TravessiaDefinition.is_walkable(
 		Vector2(brutus.global_position.x, brutus.global_position.z), false,

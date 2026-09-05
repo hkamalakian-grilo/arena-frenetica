@@ -121,10 +121,14 @@ func _run() -> void:
 
 	# 5. Investida stuns; the stunned minion stops moving and is marked.
 	minion.global_position = lane + Vector3(0.0, 0.0, -3.0)
+	minion.lane_x = lane.x
 	minion.health = minion.max_health
 	minion.objective = null
 	brutus.last_direction = Vector3(0, 0, -1)
 	brutus.q_cooldown_left = 0.0
+	brutus.global_position = lane
+	brutus.velocity = Vector3.ZERO
+	await physics_frame
 	brutus.request_q()
 	assert(brutus.action_state == &"q", "Q did not start")
 	var stunned := false
@@ -133,7 +137,7 @@ func _run() -> void:
 		if minion.is_stunned():
 			stunned = true
 			break
-	assert(stunned, "Investida hit did not stun the minion")
+	assert(stunned, "Investida must stun an enemy it charges through")
 	assert(minion.stun_marker != null and minion.stun_marker.visible,
 		"Stunned minion must display its marker")
 	assert(minion.velocity.is_zero_approx(), "Stunned minion must not move")

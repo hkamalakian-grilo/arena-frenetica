@@ -70,6 +70,13 @@ humano, nada acontece; com o humano, só ele decide e o placar não explica.
 19. Heróis com ~30 px de diâmetro na câmera de mapa inteiro; validar em
     aparelho.
 
+## Estado após os lotes 1 e 2 (mesmo dia)
+
+Feitos: 1, 2, 3, 4, 5, 6, 8, 9, 10, 12, 13, 14, 15 (wave mantida em 10 s,
+documentado em `MATCH_FLOW.md`). Item 7 não era bug: o quarto herói é o
+jogador. Ficam para depois: 11 (deslocamento pós-morte), 16–19 (fase seguinte
+do roadmap). Detalhes em `MATCH_FLOW.md` e `GAME_FEEL.md`.
+
 ## Ordem sugerida de ataque
 
 Lote 1 (faz a partida acontecer, ~2 dias):
