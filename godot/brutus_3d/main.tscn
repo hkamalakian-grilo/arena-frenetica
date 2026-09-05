@@ -58,10 +58,10 @@ shape = SubResource("CapsuleShape_brutus")
 [node name="CameraRig" type="Node3D" parent="."]
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
-position = Vector3(0, 36, 9.65)
-rotation_degrees = Vector3(-75, 0, 0)
+position = Vector3(0, 26, 15)
+rotation_degrees = Vector3(-60, 0, 0)
 projection = 1
-size = 37.0
+size = 14.0
 far = 200.0
 current = true
 

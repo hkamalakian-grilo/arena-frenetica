@@ -53,10 +53,28 @@ func _run() -> void:
 	assert(game.get_node("TravessiaMap") is TravessiaMap, "Canonical Travessia map is missing")
 	assert(game.get_node("TravessiaMap/ArenaBounds").get_child_count() == 4,
 		"Travessia must contain four arena boundaries")
-	assert(is_equal_approx(game.get_node("CameraRig/Camera3D").size, 37.0),
-		"Portrait camera must preserve vertical safety around the main towers")
-	assert(not game.follow_player_camera,
-		"Complete-map presentation must not follow and crop around Brutus")
+	assert(is_equal_approx(game.get_node("CameraRig/Camera3D").size, 14.0),
+		"Brawler camera must stay close to the action")
+	assert(game.follow_player_camera,
+		"Close camera must follow Brutus; the minimap covers the overview")
+	assert(game.get_node("HUD/Minimap") is Minimap, "Minimap is missing from the HUD")
+	brutus.global_position = Vector3(-8.0, 0.0, -16.0)
+	game.snap_camera_to_player()
+	var rig := game.get_node("CameraRig") as Node3D
+	assert(absf(rig.global_position.x) <= 5.0 + 0.01 and rig.global_position.z >= -8.8 - 0.01,
+		"Camera rig must clamp so the map edge never shows")
+	brutus.global_position = TravessiaDefinition.PLAYER_SPAWN
+	game.snap_camera_to_player()
+	var outlined := 0
+	for child in brutus.visual_root.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := child as MeshInstance3D
+		if mesh_instance.mesh == null or mesh_instance.mesh.get_surface_count() == 0:
+			continue
+		var material := mesh_instance.get_active_material(0) as StandardMaterial3D
+		if material != null and material.diffuse_mode == BaseMaterial3D.DIFFUSE_TOON 				and material.next_pass is ShaderMaterial:
+			outlined += 1
+	assert(outlined > 0, "Brutus must use toon lighting with an outline pass")
+	assert(brutus.get_node_or_null("BlobShadow") != null, "Brutus needs a ground blob shadow")
 	var terrain_art := game.get_node(
 		"TravessiaMap/TerrainLayer/TerrainArt") as MeshInstance3D
 	assert(terrain_art != null, "Travessia 2.5D terrain layer is missing")

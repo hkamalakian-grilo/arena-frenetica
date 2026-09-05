@@ -20,8 +20,9 @@ partida (waves, torres, dragão, relógio) não muda.
 - **Mira manual.** `request_q(aim)` / `request_r(aim)` recebem uma direção de
   mundo; zero = quick cast com assistência. No teclado, Q/R miram no cursor do
   mouse (`mouse_world_direction()`), como no HTML.
-- **Prévia de alcance.** `show_aim_preview(kind, dir)` desenha no chão a faixa
-  do dash (Q, laranja) ou a linha do escudo (R, roxa) enquanto o botão é segurado.
+- **Prévia de alcance.** `show_aim_preview(kind, dir)` liga o indicador 2D do
+  HUD (`AimIndicator`) com a faixa do dash (Q, laranja) ou a linha do escudo
+  (R, roxa) enquanto o botão é segurado.
 - Sinais novos: `action_started(kind)` e `shield_returned`, usados pelo áudio.
 
 ### Números do Brutus (jogador) e por que diferem do HTML

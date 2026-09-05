@@ -18,7 +18,7 @@ final é este projeto Godot e não precisa reproduzir as limitações visuais do
 - Golpe básico acionado por espaço, Enter ou botão touch.
 - Q — Investida: preparação atrás do escudo, dash, rastro e impacto; cooldown de 7 s.
 - R — Escudo Bumerangue: giro de tronco, escudo destacável, voo, impacto e retorno; cooldown de 35 s.
-- Câmera MOBA ortográfica inclinada em 55°.
+- Câmera ortográfica de brawler (60°) que segue o jogador; minimapa no HUD.
 - Ovo e dragão centrais totalmente 3D, autorais e animados; o evento inclui
   pulsação, eclosão, rugido, ataque, dano e morte sem sprites billboard.
 - Elenco Alpha completo em 3D autoral: Brutus, Lyra, Nix e Sol, além de minions
@@ -38,6 +38,10 @@ final é este projeto Godot e não precisa reproduzir as limitações visuais do
   troca de lane. Minions andam em coluna e trocam golpes de forma justa.
 - Dragão com buff temporário (+30% por 45 s) e waves reforçadas; desempate em
   cascata legível no HUD. Ver `docs/MATCH_FLOW.md`.
+- Câmera de brawler: perto do Brutus, 60° de inclinação, segue com suavização
+  e nunca mostra fora do mapa; minimapa com a janela da câmera; personagens
+  com sombreado toon, contorno e sombra no chão; indicador de mira em 2D.
+  Ver `docs/PRESENTATION.md`.
 
 ## Como executar
 

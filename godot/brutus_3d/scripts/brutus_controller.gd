@@ -67,8 +67,6 @@ var buffered_action: StringName = &""
 var buffered_aim := Vector3.ZERO
 var buffer_left := 0.0
 var last_assist_target: Node3D
-var aim_preview: MeshInstance3D
-var aim_preview_material: StandardMaterial3D
 var aim_preview_kind: StringName = &""
 var aim_preview_direction := Vector3(0, 0, -1)
 var q_contact_done := false
@@ -208,47 +206,33 @@ func heal(amount: float) -> void:
 	health_changed.emit(health, max_health)
 
 
-## Ground indicator drawn while the player holds an ability button. `kind` is
-## &"q" (dash lane) or &"r" (shield line). Hidden with hide_aim_preview().
+## Aim indicator state read by the HUD (AimIndicator) while the player holds
+## an ability button. `kind` is &"q" (dash lane) or &"r" (shield line).
 func show_aim_preview(kind: StringName, direction: Vector3) -> void:
 	var flat := Vector3(direction.x, 0.0, direction.z)
 	if flat.length_squared() < 0.001:
 		flat = last_direction
-	flat = flat.normalized()
-	if aim_preview == null:
-		aim_preview = MeshInstance3D.new()
-		aim_preview.name = "AimPreview"
-		aim_preview.mesh = PlaneMesh.new()
-		aim_preview_material = StandardMaterial3D.new()
-		aim_preview_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		aim_preview_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		aim_preview_material.no_depth_test = true
-		aim_preview.material_override = aim_preview_material
-		get_parent().add_child(aim_preview)
-	var length := q_dash_speed * 0.5 + 0.6 if kind == &"q" else 5.8
-	var width := 1.1 if kind == &"q" else 0.9
-	(aim_preview.mesh as PlaneMesh).size = Vector2(width, length)
-	aim_preview_material.albedo_color = Color(1.0, 0.62, 0.15, 0.32) if kind == &"q" \
-		else Color(0.8, 0.5, 1.0, 0.32)
 	aim_preview_kind = kind
-	aim_preview_direction = flat
-	aim_preview.visible = true
-	_update_aim_preview()
+	aim_preview_direction = flat.normalized()
 
 
 func hide_aim_preview() -> void:
 	aim_preview_kind = &""
-	if aim_preview != null:
-		aim_preview.visible = false
+
+
+func is_aim_preview_visible() -> bool:
+	return not aim_preview_kind.is_empty()
+
+
+## Ground length and width of the indicator strip for a kind, in world units.
+func aim_preview_extent(kind: StringName) -> Vector2:
+	if kind == &"q":
+		return Vector2(1.1, q_dash_speed * 0.5 + 0.6)
+	return Vector2(0.9, 5.8)
 
 
 func _update_aim_preview() -> void:
-	if aim_preview == null or not aim_preview.visible:
-		return
-	var length := (aim_preview.mesh as PlaneMesh).size.y
-	aim_preview.global_position = global_position + aim_preview_direction * (length * 0.5) \
-		+ Vector3(0, 0.06, 0)
-	aim_preview.rotation.y = atan2(aim_preview_direction.x, aim_preview_direction.z)
+	pass
 
 
 ## World direction from Brutus to the mouse cursor on the ground plane, or
@@ -469,21 +453,10 @@ func _add_team_ring() -> void:
 
 
 func _tune_model_materials(model: Node) -> void:
-	for child in model.find_children("*", "MeshInstance3D", true, false):
-		var mesh_instance := child as MeshInstance3D
-		if mesh_instance == null or mesh_instance.mesh == null:
-			continue
-		for surface_index in range(mesh_instance.mesh.get_surface_count()):
-			var source := mesh_instance.get_active_material(surface_index) \
-				as StandardMaterial3D
-			if source == null:
-				continue
-			var material := source.duplicate() as StandardMaterial3D
-			material.roughness = maxf(material.roughness, 0.56)
-			if material.emission_enabled:
-				material.emission_energy_multiplier = minf(
-					material.emission_energy_multiplier, 0.65)
-			mesh_instance.set_surface_override_material(surface_index, material)
+	# Cartoon look: hard lighting steps plus a dark silhouette. The model is
+	# scaled by 0.56, so the outline width is given in model units.
+	ToonStyle.apply(model, 0.06)
+	ToonStyle.add_blob_shadow(self, 1.35)
 
 
 func _process_locomotion(delta: float) -> void:
@@ -669,6 +642,7 @@ func _launch_shield() -> void:
 	shield_hand_mesh.visible = false
 	shield_projectile = SHIELD_SCENE.instantiate()
 	shield_projectile.name = "ThrownShield"
+	ToonStyle.apply(shield_projectile, 0.05)
 	get_parent().add_child(shield_projectile)
 	shield_projectile_direction = last_direction.normalized()
 	var left_offset := Vector3(-shield_projectile_direction.z, 0.0, shield_projectile_direction.x) * 0.72

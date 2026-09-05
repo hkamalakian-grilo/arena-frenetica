@@ -511,6 +511,7 @@ func _build_dragon_3d() -> void:
 
 
 func _configure_creature_animation() -> void:
+	ToonStyle.apply(creature_model, 0.04)
 	creature_animation = creature_model.find_child(
 		"AnimationPlayer", true, false) as AnimationPlayer
 	if creature_animation == null:

@@ -327,9 +327,12 @@ func _run() -> void:
 	brutus.request_q(Vector3(1, 0, 0))
 	assert(brutus.q_direction.is_equal_approx(Vector3(1, 0, 0)), "Manual aim must override assist")
 	brutus.show_aim_preview(&"q", Vector3(0, 0, -1))
-	assert(brutus.aim_preview != null and brutus.aim_preview.visible, "Aim preview must appear")
+	assert(brutus.is_aim_preview_visible(), "Aim preview must appear")
+	var indicator := game.get_node("HUD/AimIndicator") as AimIndicator
+	assert(indicator != null and indicator.strip_points(brutus).size() == 4,
+		"HUD aim indicator must project the strip corners")
 	brutus.hide_aim_preview()
-	assert(not brutus.aim_preview.visible, "Aim preview must hide")
+	assert(not brutus.is_aim_preview_visible(), "Aim preview must hide")
 	var joystick := game.get_node("HUD/VirtualJoystick") as FreneticJoystick
 	joystick.call("_begin", Vector2(300, 300))
 	assert(joystick.active and joystick.base_center == Vector2(300, 300), "Joystick must float to the touch")

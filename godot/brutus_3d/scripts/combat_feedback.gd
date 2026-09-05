@@ -80,7 +80,7 @@ func spawn_damage_number(world_position: Vector3, amount: float, color: Color,
 	label.no_depth_test = true
 	label.font_size = 64
 	label.outline_size = 14
-	label.pixel_size = 0.0075 * scale
+	label.pixel_size = 0.0042 * scale
 	label.modulate = color
 	label.outline_modulate = Color(0.05, 0.05, 0.08, 0.95)
 	label.render_priority = 4
@@ -98,7 +98,7 @@ func spawn_damage_number(world_position: Vector3, amount: float, color: Color,
 
 ## Short word popup (ABATE!, ATORDOADO) rendered larger than a number.
 func spawn_text(world_position: Vector3, text: String, color: Color) -> Label3D:
-	var label := spawn_damage_number(world_position, 0.0, color, 1.3)
+	var label := spawn_damage_number(world_position, 0.0, color, 0.85)
 	if label != null:
 		label.text = text
 	return label
@@ -108,7 +108,7 @@ func spawn_text(world_position: Vector3, text: String, color: Color) -> Label3D:
 func flash_hurt(strength: float) -> void:
 	if hurt_flash == null:
 		return
-	flash_strength = clampf(0.45 + strength * 0.6, 0.45, 1.0)
+	flash_strength = clampf(0.40 + strength * 0.5, 0.40, 0.85)
 	var tween := create_tween()
 	tween.tween_property(self, "flash_strength", 0.0, 0.42) \
 		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
@@ -136,7 +136,7 @@ uniform float strength : hint_range(0.0, 1.0) = 0.0;
 void fragment() {
 	vec2 centered = UV * 2.0 - 1.0;
 	float radial = dot(centered, centered);
-	float edge = smoothstep(0.30, 1.55, radial);
+	float edge = smoothstep(0.48, 1.55, radial);
 	COLOR = vec4(0.86, 0.07, 0.10, edge * strength * 0.85);
 }
 """

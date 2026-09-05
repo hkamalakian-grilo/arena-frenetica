@@ -41,9 +41,18 @@ var wave_index := 0
 var feedback: CombatFeedback
 var sfx: ArenaSfx
 var advantage_label: Label
+var minimap: Minimap
+var aim_indicator: AimIndicator
 var charge_hit_ids: Array = []
 var last_brutus_health := -1.0
-@export var follow_player_camera := false
+## Close brawler camera (see docs/PRESENTATION.md). The camera rig may travel
+## this far from the centre before the painted map edge would show.
+const CAMERA_LIMIT := Vector2(5.0, 8.8)
+const CAMERA_LIMIT_Z_MIN := -8.8
+const CAMERA_LIMIT_Z_MAX := 8.8
+const CAMERA_LEAD := 0.9
+const CAMERA_FOLLOW_SPEED := 6.0
+@export var follow_player_camera := true
 
 func _ready() -> void:
 	Engine.time_scale = float(match_rules.get("game_speed", 1.0))
@@ -61,6 +70,7 @@ func _ready() -> void:
 	brutus.global_position = TravessiaDefinition.PLAYER_SPAWN
 	brutus.last_direction = Vector3(0, 0, -1)
 	camera_rest_position = camera.position
+	snap_camera_to_player()
 	joystick.vector_changed.connect(brutus.set_virtual_input)
 	attack_button.quick_cast.connect(brutus.request_attack)
 	_wire_aim_button(q_button, &"q")
@@ -74,13 +84,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	var real_delta := delta / maxf(Engine.time_scale, 0.001)
-	if follow_player_camera:
-		var target := Vector3(brutus.global_position.x, 0.0, brutus.global_position.z)
-		camera_rig.global_position = camera_rig.global_position.lerp(
-			target, 1.0 - exp(-5.0 * delta)
-		)
-	else:
-		camera_rig.global_position = Vector3.ZERO
+	_update_camera_follow(delta)
+	if minimap != null:
+		minimap.queue_redraw()
 	speed_label.text = "Movimento: %d%%  |  Ritmo: %d%%" % [
 		roundi(brutus.speed_ratio * 100.0),
 		roundi(float(match_rules.get("game_speed", 1.0)) * 100.0),
@@ -230,6 +236,29 @@ func _on_ability_impact(kind: StringName, world_position: Vector3) -> void:
 			node.call("apply_slow", 0.5, 1.6)
 	if kind == &"q":
 		sfx.play(&"stun", -9.0)
+
+## Brawler-style camera: follows Brutus smoothly, with a small lead in his
+## facing direction, and never shows the void beyond the painted map.
+func _update_camera_follow(delta: float) -> void:
+	if not follow_player_camera:
+		camera_rig.global_position = Vector3.ZERO
+		return
+	var blend := 1.0 - exp(-CAMERA_FOLLOW_SPEED * delta / maxf(Engine.time_scale, 0.001))
+	camera_rig.global_position = camera_rig.global_position.lerp(_camera_target(), blend)
+
+
+func _camera_target() -> Vector3:
+	var lead := brutus.last_direction * CAMERA_LEAD
+	var target := Vector3(brutus.global_position.x + lead.x, 0.0, brutus.global_position.z + lead.z)
+	target.x = clampf(target.x, -CAMERA_LIMIT.x, CAMERA_LIMIT.x)
+	target.z = clampf(target.z, CAMERA_LIMIT_Z_MIN, CAMERA_LIMIT_Z_MAX)
+	return target
+
+
+func snap_camera_to_player() -> void:
+	if follow_player_camera:
+		camera_rig.global_position = _camera_target()
+
 
 func _update_camera_shake(delta: float) -> void:
 	if camera_shake_left > 0.0:
@@ -659,6 +688,21 @@ func _build_match_hud() -> void:
 	advantage_label.add_theme_font_size_override("font_size", 13)
 	advantage_label.add_theme_color_override("font_color", Color("cfe3cc"))
 	$HUD.add_child(advantage_label)
+
+	aim_indicator = AimIndicator.new()
+	aim_indicator.name = "AimIndicator"
+	$HUD.add_child(aim_indicator)
+	$HUD.move_child(aim_indicator, 0)
+	aim_indicator.setup(self)
+
+	minimap = Minimap.new()
+	minimap.name = "Minimap"
+	minimap.setup(self)
+	minimap.offset_left = 12.0
+	minimap.offset_top = 100.0
+	minimap.offset_right = 12.0 + Minimap.PANEL_SIZE.x
+	minimap.offset_bottom = 100.0 + Minimap.PANEL_SIZE.y
+	$HUD.add_child(minimap)
 
 	status_label = Label.new()
 	status_label.name = "Announcement"
