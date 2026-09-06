@@ -1,0 +1,50 @@
+# Mapa em blocos 3D — kit modular
+
+Decisão de 05/09/2026: a Travessia passa a ser montada com um kit de blocos
+3D em vez da pintura 2.5D. Motivo: mapas novos viram montagem numa grade
+(horas, não semanas), muros e árvores têm altura e sombra reais, e trocar
+um bloco melhora todos os mapas de uma vez. A pintura continua no
+repositório como referência (`TravessiaMap.USE_BLOCK_KIT = false` volta a ela).
+
+## Kit (`tools/build_map_kit.py` → `assets/kit/map_kit.glb`)
+
+Quinze peças geradas no Blender, na mesma linguagem low-poly dos personagens,
+sem texturas, origem no centro da célula ao nível do chão:
+
+| Peça | Uso |
+|---|---|
+| `tile_grass`, `tile_road`, `tile_water`, `tile_island`, `tile_bridge` | ladrilhos de 1×1 (instanciados a 0,5) |
+| `wall_stone` | borda do mapa e anel da ilha do dragão (os blocos dos portões somem ao chocar) |
+| `bush`, `tree_round`, `tree_pine`, `rock`, `flower` | vegetação e pedras nas bordas dos caminhos e no interior |
+| `bridge_post` | pilares nos cantos das pontes de lane |
+| `platform_tower`, `platform_core` | bases das torres de lane e das torres principais |
+| `dragon_pit` | poço brilhante no centro da ilha |
+
+Regerar: `blender --background --factory-startup --python tools/build_map_kit.py`
+e depois `godot --headless --path . --import`. A prévia fica em
+`assets/kit/map_kit_preview.png`.
+
+## Montagem (`scripts/block_map.gd`)
+
+- Grade de 0,5 unidades (36×68 células) classificada a partir de
+  `TravessiaDefinition.is_walkable` (estrada), da faixa do rio e do lago
+  (água), do raio da ilha (ilha/anel) e do cruzamento andável × água (ponte).
+  Não existe um "tilemap" separado para desenhar à mão: mudar um retângulo
+  andável muda o mapa.
+- Cada peça é um `MultiMeshInstance3D`; ladrilhos não projetam sombra,
+  vegetação e muros projetam.
+- Vegetação: células de grama encostadas num caminho recebem moita (62%),
+  árvore (24%) ou pedra; o interior recebe pinheiros, árvores, pedras e
+  flores esparsos (semente fixa, o mapa é sempre igual).
+- Plataformas das torres (`TowerPlatforms`, móveis pelos testes), plataformas
+  dos núcleos e o poço do dragão são nós próprios.
+- `open_gates()` esconde os blocos do anel na frente dos dois portões; as
+  pontes dinâmicas (`ModularBridge3D`) continuam iguais.
+- `ToonStyle.convert_mesh` aplica o shader cel + contorno às peças
+  (contorno mais fino e degradê baixo nos ladrilhos).
+
+## O que ainda não é bloco
+
+Torres e torres principais continuam como sprites pintados sobre as
+plataformas; dragão, ovo e personagens já são 3D. A troca das torres por
+modelos 3D é o próximo passo natural do kit.

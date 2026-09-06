@@ -74,6 +74,8 @@ godot --path godot/brutus_3d
 - `tools/test_game_feel.gd`: valida mira assistida, buffer, controle de grupo, hitstop, feedback e áudio.
 - `tools/test_roster_kits.gd`: valida os kits de Lyra, Nix e Sol, a IA dos bots, a navegação, os minions em coluna, o desempate e os botões touch.
 - `tools/validate_match.gd`: partida completa de 3 minutos com Brutus automático, com linha do tempo e resumo.
+- `tools/build_map_kit.py` → `assets/kit/map_kit.glb`: kit de blocos 3D do mapa; `scripts/block_map.gd` monta a Travessia com ele a partir da máscara andável. Ver `docs/BLOCK_MAP.md`.
+- `scripts/map_life.gd`: água animada, sombras de nuvens e partículas ambiente.
 - `docs/MATCH_FLOW.md`: como bots, minions, dragão e desempate funcionam agora.
 - `scripts/data/travessia_definition.gd`: fonte canônica das posições e regras do mapa.
 - `scripts/travessia_map.gd`: apresentação jogável alinhada à arte aprovada da Travessia.

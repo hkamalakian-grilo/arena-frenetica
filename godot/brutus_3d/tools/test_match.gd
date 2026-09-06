@@ -75,68 +75,28 @@ func _run() -> void:
 			outlined += 1
 	assert(outlined > 0, "Brutus must use cel lighting with an outline pass")
 	assert(brutus.get_node_or_null("BlobShadow") != null, "Brutus needs a ground blob shadow")
-	var terrain_art := game.get_node(
-		"TravessiaMap/TerrainLayer/TerrainArt") as MeshInstance3D
-	assert(terrain_art != null, "Travessia 2.5D terrain layer is missing")
-	assert(game.get_node("TravessiaMap").uses_canonical_2_5d_art(),
-		"Travessia must preserve the approved artwork in its 2.5D presentation")
-	var terrain_mesh := terrain_art.mesh as PlaneMesh
-	assert(terrain_mesh != null and terrain_mesh.subdivide_width >= 95 \
-		and terrain_mesh.subdivide_depth >= 191,
-		"Travessia terrain must have enough geometry for authored relief")
-	var terrain_material := terrain_art.material_override as ShaderMaterial
-	var terrain_texture := terrain_material.get_shader_parameter("terrain_texture") \
-		as Texture2D
-	var height_texture := terrain_material.get_shader_parameter("height_texture") \
-		as Texture2D
-	assert(terrain_texture.resource_path.ends_with(
-		"travessia_terrain_v6.png"),
-		"Travessia 2.5D must keep the approved terrain artwork")
-	assert(height_texture.resource_path.ends_with("travessia_depth_v1.png"),
-		"Travessia 2.5D must use the aligned authored height map")
-	var upper_left_camp := game.get_node(
-		"TravessiaMap/StaticProps/JungleModules/UpperLeftCamp") \
-		as MeshInstance3D
-	assert(upper_left_camp != null,
-		"The first separated jungle camp module must exist")
-	var camp_material := upper_left_camp.material_override as ShaderMaterial
-	var camp_texture := camp_material.get_shader_parameter("module_texture") \
-		as Texture2D
-	assert(camp_texture.resource_path.ends_with("upper_left_camp_full_v1.png"),
-		"The separated camp must use untouched pixels from the approved map")
-	var jungle_modules := game.get_node(
-		"TravessiaMap/StaticProps/JungleModules") as Node3D
-	assert(jungle_modules.get_child_count() == 4,
-		"All four jungle camps must be independent 2.5D modules")
-	for camp_name in ["UpperLeftCamp", "UpperRightCamp", "LowerLeftCamp",
-			"LowerRightCamp"]:
-		var camp_module := jungle_modules.get_node(camp_name) as MeshInstance3D
-		assert(camp_module != null and camp_module.get_meta("module_kind") \
-			== &"jungle_camp", "Every jungle camp must expose a stable module")
-	var map_art_modules := game.get_node(
-		"TravessiaMap/StaticProps/MapArtModules") as Node3D
-	assert(map_art_modules != null and map_art_modules.get_child_count() == 9,
-		"Travessia must expose all nine independent environment modules")
-	var expected_map_modules := {
-		"NorthBoundary": &"boundary",
-		"SouthBoundary": &"boundary",
-		"WestOuterForest": &"outer_forest",
-		"EastOuterForest": &"outer_forest",
-		"NorthRiverBank": &"river_bank",
-		"SouthRiverBank": &"river_bank",
-		"DragonIsland": &"dragon_island",
-		"LeftLaneBridge": &"lane_bridge",
-		"RightLaneBridge": &"lane_bridge",
-	}
-	for module_name in expected_map_modules:
-		var map_module := map_art_modules.get_node(module_name) as MeshInstance3D
-		assert(map_module != null and map_module.get_meta("module_kind") \
-			== expected_map_modules[module_name],
-			"Every environment section must expose a stable 2.5D module")
-	assert(game.get_node("TravessiaMap/StaticProps/TowerPlatforms").get_child_count() == 4,
+	# Block-kit presentation: the map is instanced from assets/kit/map_kit.glb
+	# on a grid derived from the walkable mask, with real light and shadow.
+	assert(game.arena_map.uses_block_kit(), "Travessia must be built from the 3D block kit")
+	var block_map: BlockMap = game.arena_map.block_map
+	assert(block_map != null and block_map.piece_names().size() >= 14,
+		"The map kit must load every authored piece")
+	for piece_name in ["tile_grass", "tile_road", "tile_water", "tile_bridge", "bush",
+			"tree_round", "wall_stone"]:
+		assert(block_map.get_node_or_null(piece_name) is MultiMeshInstance3D,
+			"Block map must instance %s" % piece_name)
+	assert(block_map.count_cells(BlockMap.Cell.ROAD) > 300
+		and block_map.count_cells(BlockMap.Cell.WATER) > 80
+		and block_map.count_cells(BlockMap.Cell.BRIDGE) >= 12,
+		"Grid classification must produce roads, water and bridges")
+	assert(block_map.get_node("TowerPlatforms").get_child_count() == 4,
 		"Every lane tower must have an independent movable platform")
+	assert(block_map.get_node("DragonGates").get_child_count() >= 4,
+		"The island must have removable gate blocks")
 	assert(game.get_node("TravessiaMap/DynamicProps") is Node3D,
 		"Travessia dynamic-prop layer is missing")
+	assert(game.get_node("TravessiaMap/DynamicProps/MapLife/WaterRipples") is MeshInstance3D,
+		"Animated water must be present")
 	assert(TravessiaDefinition.structures().size() == 6,
 		"Travessia data must define two bases and four towers")
 	assert(TravessiaDefinition.LANE_X.size() == 2, "Travessia must define two lanes")
@@ -277,13 +237,8 @@ func _run() -> void:
 	assert(game.get_node_or_null(
 		"TravessiaMap/DynamicProps/DragonAccessBridges") != null,
 		"Central access bridges were not created during the hatch event")
-	var open_island_material := game.arena_map.dragon_island_module \
-		.material_override as ShaderMaterial
-	var open_island_texture := open_island_material.get_shader_parameter(
-		"module_texture") as Texture2D
-	assert(open_island_texture.resource_path.ends_with(
-		"dragon_island_open_full_v1.png"),
-		"Dragon hatch must switch the island to its open-entrance layer")
+	for gate in game.arena_map.block_map.gate_blocks:
+		assert(not gate.visible, "Dragon hatch must open the island gate blocks")
 	assert(not game.arena_map.is_dragon_access_open(),
 		"Dragon access must remain blocked while the bridges are assembling")
 	await create_timer(1.5).timeout

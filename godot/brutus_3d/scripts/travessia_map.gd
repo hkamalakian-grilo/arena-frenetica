@@ -54,6 +54,11 @@ const UPPER_RIGHT_CAMP_REGION := Rect2(418.0, 300.0, 320.0, 360.0)
 const LOWER_LEFT_CAMP_REGION := Rect2(175.0, 980.0, 320.0, 450.0)
 const LOWER_RIGHT_CAMP_REGION := Rect2(418.0, 980.0, 320.0, 450.0)
 
+## Presentation: the modular 3D block kit (long-term) or the painted 2.5D
+## layers kept as reference. Gameplay data is identical in both.
+const USE_BLOCK_KIT := true
+
+var block_map: BlockMap
 var dragon_access: Node3D
 var terrain_layer: Node3D
 var static_props: Node3D
@@ -68,15 +73,22 @@ func build() -> void:
 	add_to_group("travessia_map")
 	_create_visual_layers()
 	_build_environment()
-	_add_terrain_art()
-	_add_static_art_modules()
-	_add_jungle_modules()
-	_add_tower_platforms()
+	if USE_BLOCK_KIT:
+		block_map = BlockMap.new()
+		static_props.add_child(block_map)
+		block_map.build()
+	else:
+		_add_terrain_art()
+		_add_static_art_modules()
+		_add_jungle_modules()
+		_add_tower_platforms()
 	_add_floor_collision()
 	_add_boundary_collisions()
 	var life := MapLife.new()
 	dynamic_props.add_child(life)
 	life.build()
+	if block_map != null:
+		life.water.position.y = -0.17
 
 
 func _create_visual_layers() -> void:
@@ -134,7 +146,11 @@ void fragment() {
 
 
 func uses_canonical_2_5d_art() -> bool:
-	return true
+	return not USE_BLOCK_KIT
+
+
+func uses_block_kit() -> bool:
+	return block_map != null
 
 
 func _add_static_art_modules() -> void:
@@ -255,10 +271,14 @@ func _add_tower_platforms() -> void:
 
 
 func get_tower_platform(structure_id: StringName) -> Node3D:
+	if block_map != null:
+		return block_map.get_tower_platform(structure_id)
 	return tower_platforms.get(structure_id) as Node3D
 
 
 func move_tower_platform(structure_id: StringName, at_position: Vector3) -> bool:
+	if block_map != null:
+		return block_map.move_tower_platform(structure_id, at_position)
 	var platform := get_tower_platform(structure_id)
 	if platform == null:
 		return false
@@ -274,7 +294,7 @@ func _build_environment() -> void:
 	environment.background_color = Color("102619")
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	environment.ambient_light_color = Color("b9d5bd")
-	environment.ambient_light_energy = 0.62
+	environment.ambient_light_energy = 0.48
 	environment.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	world.environment = environment
 	add_child(world)
@@ -371,6 +391,8 @@ func open_dragon_access(duration: float = 1.2) -> void:
 
 
 func _open_dragon_island_entrances() -> void:
+	if block_map != null:
+		block_map.open_gates()
 	if dragon_island_module == null:
 		return
 	var material := dragon_island_module.material_override as ShaderMaterial

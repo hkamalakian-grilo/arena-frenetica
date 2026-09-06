@@ -98,6 +98,33 @@ static func apply(model: Node, outline_width: float, saturation := 1.08) -> void
 			mesh_instance.set_surface_override_material(surface_index, material)
 
 
+## Same look applied to the surfaces of a Mesh resource (for MultiMesh use).
+## `gradient_top` sets where the vertical shade reaches full brightness.
+static func convert_mesh(mesh: Mesh, outline_width: float, gradient_top := 1.6,
+		saturation := 1.05) -> void:
+	if mesh == null:
+		return
+	if _cel_shader == null:
+		_cel_shader = Shader.new()
+		_cel_shader.code = CEL_SHADER
+	var outline := _outline_material(outline_width)
+	for surface_index in range(mesh.get_surface_count()):
+		var source := mesh.surface_get_material(surface_index) as StandardMaterial3D
+		if source == null:
+			continue
+		var material := ShaderMaterial.new()
+		material.shader = _cel_shader
+		material.set_shader_parameter("albedo", _punch(source.albedo_color, saturation))
+		material.set_shader_parameter("gradient_top", gradient_top)
+		material.set_shader_parameter("gradient_floor", 0.72)
+		if source.emission_enabled:
+			material.set_shader_parameter("emission_color", source.emission)
+			material.set_shader_parameter("emission_energy",
+				minf(source.emission_energy_multiplier, 1.2))
+		material.next_pass = outline
+		mesh.surface_set_material(surface_index, material)
+
+
 static func add_blob_shadow(parent: Node3D, size: float, height := 0.03) -> MeshInstance3D:
 	var shadow := MeshInstance3D.new()
 	shadow.name = "BlobShadow"
