@@ -59,6 +59,11 @@ func _draw() -> void:
 	draw_rect(_rect(Vector2(0.0, 7.1), Vector2(1.3, 3.8)), Color(0.78, 0.62, 0.36, 0.9))
 	draw_rect(_rect(Vector2(0.0, -12.7), Vector2(7.2, 2.4)), Color(0.72, 0.56, 0.34, 0.9))
 	draw_rect(_rect(Vector2(0.0, 12.7), Vector2(7.2, 2.4)), Color(0.72, 0.56, 0.34, 0.9))
+	for bush in TravessiaDefinition.CAMP_BUSHES:
+		var camp_center: Vector2 = bush.center
+		var camp := _to_panel(camp_center.x, camp_center.y)
+		var camp_radius := float(bush.radius) / (MAP_HALF.x * 2.0) * size.x
+		draw_circle(camp, camp_radius, Color(0.30, 0.62, 0.28, 0.95))
 	var island := _to_panel(0.0, 0.0)
 	var island_radius := TravessiaDefinition.DRAGON_ISLAND_RADIUS / (MAP_HALF.x * 2.0) * size.x
 	draw_circle(island, island_radius, Color(0.58, 0.40, 0.72, 0.95))

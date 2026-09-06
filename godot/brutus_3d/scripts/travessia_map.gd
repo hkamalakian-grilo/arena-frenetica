@@ -74,6 +74,9 @@ func build() -> void:
 	_add_tower_platforms()
 	_add_floor_collision()
 	_add_boundary_collisions()
+	var life := MapLife.new()
+	dynamic_props.add_child(life)
+	life.build()
 
 
 func _create_visual_layers() -> void:

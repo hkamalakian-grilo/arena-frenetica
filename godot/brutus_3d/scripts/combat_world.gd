@@ -6,10 +6,22 @@ extends RefCounted
 ## coupling gameplay scripts to main.gd.
 
 
-static func is_valid_target(candidate) -> bool:
-	return is_instance_valid(candidate) and candidate is Node3D \
-		and candidate.has_method("get_team") and candidate.has_method("take_damage") \
-		and candidate.has_method("is_targetable") and bool(candidate.call("is_targetable"))
+## `viewer` enables bush concealment: a hidden hero only counts as a target
+## for viewers within BUSH_REVEAL_DISTANCE.
+static func is_valid_target(candidate, viewer: Node3D = null) -> bool:
+	if not (is_instance_valid(candidate) and candidate is Node3D \
+			and candidate.has_method("get_team") and candidate.has_method("take_damage") \
+			and candidate.has_method("is_targetable") and bool(candidate.call("is_targetable"))):
+		return false
+	if viewer != null and is_concealed(candidate) \
+			and planar(viewer, candidate) > TravessiaDefinition.BUSH_REVEAL_DISTANCE:
+		return false
+	return true
+
+
+static func is_concealed(candidate) -> bool:
+	return is_instance_valid(candidate) and candidate.has_method("is_concealed") \
+		and bool(candidate.call("is_concealed"))
 
 
 static func is_structure(candidate) -> bool:

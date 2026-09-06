@@ -72,6 +72,31 @@ var aim_preview_direction := Vector3(0, 0, -1)
 var q_contact_done := false
 var q_contact_radius := 1.15
 var run_dust_distance := 0.0
+var concealed := false
+var reveal_left := 0.0
+var team_ring_material: StandardMaterial3D
+
+
+func is_concealed() -> bool:
+	return concealed
+
+
+func reveal(seconds := TravessiaDefinition.BUSH_REVEAL_SECONDS) -> void:
+	reveal_left = maxf(reveal_left, seconds)
+
+
+func _update_concealment(delta: float) -> void:
+	reveal_left = maxf(0.0, reveal_left - delta)
+	var in_bush := TravessiaDefinition.is_in_bush(Vector2(global_position.x, global_position.z))
+	var next := in_bush and reveal_left <= 0.0 and not is_defeated
+	if next == concealed:
+		return
+	concealed = next
+	if team_ring_material != null:
+		# Green ring tells the player "you are hidden"; blue when exposed.
+		team_ring_material.albedo_color = Color(0.45, 1.0, 0.5, 0.9) if concealed \
+			else Color(0.18, 0.78, 1.0, 0.88)
+		team_ring_material.emission = Color("6cff7a") if concealed else Color("38cfff")
 
 
 func _enemy_within(radius: float) -> bool:
@@ -310,7 +335,7 @@ func _assisted_direction(fallback: Vector3, max_range: float, cone_degrees: floa
 			continue
 		if int(candidate.call("get_team")) == get_team():
 			continue
-		if candidate.has_method("is_targetable") and not bool(candidate.call("is_targetable")):
+		if not CombatWorld.is_valid_target(candidate, self):
 			continue
 		var offset := Vector2(candidate.global_position.x, candidate.global_position.z) - origin
 		var distance := offset.length()
@@ -337,6 +362,8 @@ func _assisted_direction(fallback: Vector3, max_range: float, cone_degrees: floa
 
 
 func _begin_action(next_state: StringName) -> void:
+	if next_state != &"hurt":
+		reveal()
 	action_state = next_state
 	action_elapsed = 0.0
 	locomotion_animation = &""
@@ -359,6 +386,7 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector3.ZERO
 		return
 	var real_delta := delta / maxf(Engine.time_scale, 0.001)
+	_update_concealment(delta)
 	q_cooldown_left = maxf(0.0, q_cooldown_left - real_delta)
 	r_cooldown_left = maxf(0.0, r_cooldown_left - real_delta)
 	action_elapsed += delta if not action_state.is_empty() else 0.0
@@ -401,6 +429,7 @@ func take_damage(amount: float, source_team: int = -1) -> void:
 	if is_defeated or amount <= 0.0:
 		return
 	last_damage_team = source_team
+	reveal()
 	health = maxf(0.0, health - amount)
 	health_changed.emit(health, max_health)
 	if health <= 0.0:
@@ -450,6 +479,7 @@ func _add_team_ring() -> void:
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	ring.material_override = material
 	ring.position.y = 0.055
+	team_ring_material = material
 	add_child(ring)
 
 

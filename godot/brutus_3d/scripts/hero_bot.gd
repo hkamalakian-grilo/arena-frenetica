@@ -45,6 +45,8 @@ var stun_left := 0.0
 var slow_left := 0.0
 var slow_factor := 1.0
 var stun_marker: MeshInstance3D
+var concealed := false
+var reveal_left := 0.0
 
 var mode: StringName = &"lane"
 var lane_idle_time := 0.0
@@ -108,11 +110,34 @@ func health_ratio() -> float:
 	return health / maxf(max_health, 1.0)
 
 
+func is_concealed() -> bool:
+	return concealed
+
+
+func reveal(seconds := TravessiaDefinition.BUSH_REVEAL_SECONDS) -> void:
+	reveal_left = maxf(reveal_left, seconds)
+
+
+func _update_concealment(delta: float) -> void:
+	reveal_left = maxf(0.0, reveal_left - delta)
+	var in_bush := TravessiaDefinition.is_in_bush(Vector2(global_position.x, global_position.z))
+	var next := in_bush and reveal_left <= 0.0 and not is_defeated
+	if next == concealed:
+		return
+	concealed = next
+	# Enemy bots vanish for the player while hidden; allies stay visible.
+	if team != 0:
+		visual_model.visible = not concealed
+		health_fill.visible = not concealed
+		health_backdrop.visible = not concealed
+
+
 func take_damage(amount: float, source_team: int = -1) -> void:
 	if is_defeated or amount <= 0.0:
 		return
 	last_damage_team = source_team
 	health = maxf(0.0, health - amount)
+	reveal()
 	visual_model.trigger_hurt()
 	_update_nameplate()
 	_update_health_bar()
@@ -229,6 +254,7 @@ func _physics_process(delta: float) -> void:
 			visual_model.update_motion(delta, facing_direction, 0.0)
 			return
 	_apply_fountain(delta)
+	_update_concealment(delta)
 	if dash_target != null:
 		_process_dash(delta)
 		return
@@ -552,6 +578,7 @@ func _try_attack(target: Node3D) -> void:
 	if CombatWorld.planar(self, target) > attack_range + 0.1:
 		return
 	attack_timer = _current_attack_interval()
+	reveal()
 	visual_model.trigger_attack()
 	var amount := attack_damage * damage_multiplier
 	if empower_left > 0.0:
@@ -693,6 +720,7 @@ func _nix_q(target: Node3D) -> bool:
 			direction = offset.normalized()
 			blink = minf(blink, maxf(0.0, offset.length() - attack_range * 0.7))
 	q_cooldown_left = float(kit.q.cooldown)
+	reveal()
 	var origin := global_position
 	var destination := TravessiaDefinition.constrain_walkable_motion(origin,
 		origin + direction * blink, _dragon_access_is_open(), 0.42)
@@ -800,6 +828,7 @@ static func _ratio_of(node: Node) -> float:
 
 
 func _spawn_projectile(data: Dictionary) -> AbilityProjectile:
+	reveal()
 	var projectile := AbilityProjectile.new()
 	data["team"] = team
 	data["source"] = self
@@ -812,6 +841,7 @@ func _spawn_projectile(data: Dictionary) -> AbilityProjectile:
 
 
 func _spawn_zone(at_position: Vector3, data: Dictionary) -> AbilityZone:
+	reveal()
 	var zone := AbilityZone.new()
 	data["team"] = team
 	get_parent().add_child(zone)
@@ -871,7 +901,7 @@ func _nearest_enemy_unit(max_distance: float) -> Node3D:
 func _nearest_enemy_hero(max_distance: float) -> Node3D:
 	var candidates: Array = []
 	for node in get_tree().get_nodes_in_group("damageable"):
-		if node == self or not CombatWorld.is_hero(node) or not CombatWorld.is_valid_target(node):
+		if node == self or not CombatWorld.is_hero(node) or not CombatWorld.is_valid_target(node, self):
 			continue
 		if int(node.call("get_team")) == team:
 			continue
@@ -893,7 +923,7 @@ func _nearest_enemy_any(max_distance: float) -> Node3D:
 
 
 func _valid_target(candidate) -> bool:
-	return CombatWorld.is_valid_target(candidate) and int(candidate.call("get_team")) != team
+	return CombatWorld.is_valid_target(candidate, self) and int(candidate.call("get_team")) != team
 
 
 func _is_structure(candidate: Node) -> bool:
@@ -914,6 +944,8 @@ func _revive() -> void:
 	is_defeated = false
 	last_damage_team = -1
 	objective = null
+	concealed = false
+	reveal_left = 0.0
 	mode = &"lane"
 	route = []
 	dash_target = null

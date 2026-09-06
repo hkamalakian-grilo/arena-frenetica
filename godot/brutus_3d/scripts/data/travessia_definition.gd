@@ -49,12 +49,57 @@ const WALKABLE_RECTS := [
 
 ## The painted base walls are curved. Ellipses prevent the rectangular corner
 ## leaks that allowed actors to stand behind the north/south perimeter walls.
+## The four jungle camps are the round clearings inside the stone-and-bush
+## rings; each is also a bush (see CAMP_BUSHES) and opens through short
+## corridors measured on the authored relief.
 const WALKABLE_ELLIPSES := [
 	{"name": &"red_base", "center": Vector2(0.0, -12.70),
 		"radii": Vector2(7.65, 2.70)},
 	{"name": &"blue_base", "center": Vector2(0.0, 12.70),
 		"radii": Vector2(7.65, 2.70)},
+	{"name": &"upper_left_camp", "center": Vector2(-2.44, -7.38),
+		"radii": Vector2(1.05, 1.0)},
+	{"name": &"upper_right_camp", "center": Vector2(2.44, -7.38),
+		"radii": Vector2(1.05, 1.0)},
+	{"name": &"lower_left_camp", "center": Vector2(-2.59, 6.81),
+		"radii": Vector2(1.05, 1.0)},
+	{"name": &"lower_right_camp", "center": Vector2(2.47, 6.81),
+		"radii": Vector2(1.05, 1.0)},
 ]
+
+## Camp openings: narrow corridors from each clearing to the nearest road.
+const CAMP_CORRIDORS := [
+	{"name": &"upper_left_camp_exit", "center": Vector2(-1.75, -8.35),
+		"half_extents": Vector2(0.55, 0.85)},
+	{"name": &"upper_right_camp_exit", "center": Vector2(1.75, -8.35),
+		"half_extents": Vector2(0.55, 0.85)},
+	{"name": &"lower_left_camp_lane_exit", "center": Vector2(-3.40, 6.81),
+		"half_extents": Vector2(0.85, 0.55)},
+	{"name": &"lower_left_camp_center_exit", "center": Vector2(-1.90, 6.81),
+		"half_extents": Vector2(0.75, 0.55)},
+	{"name": &"lower_right_camp_lane_exit", "center": Vector2(3.35, 6.81),
+		"half_extents": Vector2(0.85, 0.55)},
+	{"name": &"lower_right_camp_center_exit", "center": Vector2(1.85, 6.81),
+		"half_extents": Vector2(0.75, 0.55)},
+]
+
+## Bushes: a hero standing inside is hidden from enemies farther than
+## BUSH_REVEAL_DISTANCE until they attack, cast or take damage.
+const CAMP_BUSHES := [
+	{"center": Vector2(-2.44, -7.38), "radius": 1.05},
+	{"center": Vector2(2.44, -7.38), "radius": 1.05},
+	{"center": Vector2(-2.59, 6.81), "radius": 1.05},
+	{"center": Vector2(2.47, 6.81), "radius": 1.05},
+]
+const BUSH_REVEAL_DISTANCE := 1.6
+const BUSH_REVEAL_SECONDS := 1.5
+
+
+static func is_in_bush(point: Vector2) -> bool:
+	for bush in CAMP_BUSHES:
+		if point.distance_to(bush.center) <= float(bush.radius):
+			return true
+	return false
 
 const DRAGON_ACCESS_RECTS := [
 	{"name": &"north_dragon_bridge", "center": Vector2(0.0, -2.80),
@@ -68,6 +113,9 @@ const DRAGON_ISLAND_RADIUS := 1.85
 static func is_walkable(point: Vector2, dragon_access_open := false,
 		body_radius := 0.42) -> bool:
 	for zone in WALKABLE_RECTS:
+		if _point_in_walkable_rect(point, zone, body_radius):
+			return true
+	for zone in CAMP_CORRIDORS:
 		if _point_in_walkable_rect(point, zone, body_radius):
 			return true
 	for zone in WALKABLE_ELLIPSES:
@@ -129,6 +177,7 @@ static func nearest_walkable_point(point: Vector2,
 	var best_point := Vector2.ZERO
 	var best_distance := INF
 	var zones: Array = WALKABLE_RECTS.duplicate()
+	zones.append_array(CAMP_CORRIDORS)
 	if dragon_access_open:
 		zones.append_array(DRAGON_ACCESS_RECTS)
 	for zone in zones:

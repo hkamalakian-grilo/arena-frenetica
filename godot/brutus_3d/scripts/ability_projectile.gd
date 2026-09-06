@@ -89,7 +89,7 @@ func _physics_process(delta: float) -> void:
 			return
 	else:
 		for candidate in get_tree().get_nodes_in_group("damageable"):
-			if candidate == source or not CombatWorld.is_valid_target(candidate):
+			if candidate == source or not CombatWorld.is_valid_target(candidate, self):
 				continue
 			if hit_ids.has(candidate.get_instance_id()):
 				continue

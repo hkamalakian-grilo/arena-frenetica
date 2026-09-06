@@ -447,8 +447,8 @@ func _find_nearest_enemy(max_distance: float) -> Node3D:
 func _valid_target(candidate) -> bool:
 	# A referência pode continuar armazenada por um frame depois de queue_free().
 	# Um parâmetro tipado rejeita o objeto liberado antes mesmo de esta guarda rodar.
-	return is_instance_valid(candidate) and candidate.has_method("is_targetable") \
-		and bool(candidate.call("is_targetable")) and candidate.has_method("take_damage")
+	# Heróis escondidos numa moita só contam quando este ator está bem perto.
+	return CombatWorld.is_valid_target(candidate, self)
 
 
 func _is_structure(candidate: Node) -> bool:

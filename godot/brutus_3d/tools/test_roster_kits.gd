@@ -242,6 +242,31 @@ func _run() -> void:
 	bot.queue_free()
 	await process_frame
 
+	# --- Bushes: a hero inside a camp is hidden until revealed ---
+	var scout := _spawn_bot(game, &"lyra", 1, Vector3(2.47, 0.0, 3.6))
+	scout.objective = null
+	brutus.global_position = Vector3(2.47, 0.0, 6.81)
+	brutus.reveal_left = 0.0
+	for _frame in range(3):
+		await physics_frame
+	assert(brutus.is_concealed(), "Brutus inside a camp must be concealed")
+	assert(scout.call("_nearest_enemy_hero", 5.5) == null,
+		"A bot 3 m away must not see a hero hidden in a bush")
+	scout.global_position = Vector3(2.47, 0.0, 5.6)
+	assert(scout.call("_nearest_enemy_hero", 5.5) == brutus,
+		"A bot within reveal distance must see the hidden hero")
+	scout.global_position = Vector3(2.47, 0.0, 3.6)
+	brutus.request_attack()
+	await physics_frame
+	assert(not brutus.is_concealed(), "Attacking must reveal Brutus")
+	assert(scout.call("_nearest_enemy_hero", 5.5) == brutus, "Revealed hero must be targetable")
+	for _frame in range(120):
+		await physics_frame
+	brutus.action_state = &""
+	scout.queue_free()
+	await process_frame
+	brutus.global_position = Vector3(-5.35, 0.0, 6.0)
+
 	# --- Minion column and fair trades ---
 	var leader := _spawn_minion(game, 0, Vector3(-5.35, 0.0, 4.0), false)
 	var follower := _spawn_minion(game, 0, Vector3(-5.35, 0.0, 4.3), false)

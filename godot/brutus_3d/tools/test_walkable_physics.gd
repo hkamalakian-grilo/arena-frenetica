@@ -41,12 +41,19 @@ func _run() -> void:
 		"River water outside a bridge must block movement")
 	assert(not TravessiaDefinition.is_walkable(Vector2(-4.30, 0.0)),
 		"Water immediately beside the western bridge must block movement")
-	assert(not TravessiaDefinition.is_walkable(Vector2(3.0, 6.0)),
-		"Decorative jungle outside the paths must block movement")
+	assert(not TravessiaDefinition.is_walkable(Vector2(7.6, 0.0)),
+		"Decorative forest outside the paths must block movement")
+	assert(TravessiaDefinition.is_walkable(Vector2(2.6, 6.6)),
+		"Jungle camp clearings are playable bushes")
+	assert(TravessiaDefinition.is_walkable(Vector2(3.35, 6.81)),
+		"Camp corridor to the lane must be walkable")
+	assert(TravessiaDefinition.is_in_bush(Vector2(2.47, 6.81)) \
+		and not TravessiaDefinition.is_in_bush(Vector2(5.35, 0.0)),
+		"Bush concealment must match the camp clearings")
 	assert(TravessiaDefinition.is_walkable(Vector2(-4.0, -7.5)),
 		"The cleared upper-left jungle corridor must be walkable")
-	assert(not TravessiaDefinition.is_walkable(Vector2(-2.60, -7.50)),
-		"The camp stone ring must remain outside the cleared corridor")
+	assert(TravessiaDefinition.is_walkable(Vector2(-2.60, -7.50)),
+		"The upper-left camp clearing must be enterable")
 	assert(not TravessiaDefinition.is_walkable(Vector2(30.0, 30.0)),
 		"The exterior of the arena must block movement")
 
