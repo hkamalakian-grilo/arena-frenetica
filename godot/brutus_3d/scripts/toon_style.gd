@@ -17,16 +17,21 @@ uniform float bands = 3.0;
 uniform float gradient_bottom = 0.0;
 uniform float gradient_top = 1.6;
 uniform float gradient_floor = 0.62;
+// MultiMesh instance colour replaces the albedo (painted-map tiles/props).
+uniform bool use_instance_color = false;
 
 varying float world_height;
+varying vec3 instance_tint;
 
 void vertex() {
 	world_height = (MODEL_MATRIX * vec4(VERTEX, 1.0)).y;
+	instance_tint = COLOR.rgb;
 }
 
 void fragment() {
 	float lift = smoothstep(gradient_bottom, gradient_top, world_height);
-	ALBEDO = albedo.rgb * mix(gradient_floor, 1.0, lift);
+	vec3 base = use_instance_color ? instance_tint : albedo.rgb;
+	ALBEDO = base * mix(gradient_floor, 1.0, lift);
 	EMISSION = emission_color.rgb * emission_energy;
 }
 
@@ -101,7 +106,8 @@ static func apply(model: Node, outline_width: float, saturation := 1.08) -> void
 ## Same look applied to the surfaces of a Mesh resource (for MultiMesh use).
 ## `gradient_top` sets where the vertical shade reaches full brightness.
 static func convert_mesh(mesh: Mesh, outline_width: float, gradient_top := 1.6,
-		saturation := 1.05) -> void:
+		saturation := 1.05, tintable: PackedStringArray = PackedStringArray(),
+		gradient_floor := 0.72) -> void:
 	if mesh == null:
 		return
 	if _cel_shader == null:
@@ -116,7 +122,11 @@ static func convert_mesh(mesh: Mesh, outline_width: float, gradient_top := 1.6,
 		material.shader = _cel_shader
 		material.set_shader_parameter("albedo", _punch(source.albedo_color, saturation))
 		material.set_shader_parameter("gradient_top", gradient_top)
-		material.set_shader_parameter("gradient_floor", 0.72)
+		material.set_shader_parameter("gradient_floor", gradient_floor)
+		for key in tintable:
+			if source.resource_name.containsn(key):
+				material.set_shader_parameter("use_instance_color", true)
+				break
 		if source.emission_enabled:
 			material.set_shader_parameter("emission_color", source.emission)
 			material.set_shader_parameter("emission_energy",

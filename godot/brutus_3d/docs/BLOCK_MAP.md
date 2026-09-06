@@ -26,16 +26,22 @@ e depois `godot --headless --path . --import`. A prévia fica em
 
 ## Montagem (`scripts/block_map.gd`)
 
-- Grade de 0,5 unidades (36×68 células) classificada a partir de
+A regra é **reproduzir a pintura aprovada**, não inventar outro mapa:
+
+- Grade de 0,5 unidades (36×68 células). O tipo de cada célula vem de
   `TravessiaDefinition.is_walkable` (estrada), da faixa do rio e do lago
   (água), do raio da ilha (ilha/anel) e do cruzamento andável × água (ponte).
-  Não existe um "tilemap" separado para desenhar à mão: mudar um retângulo
-  andável muda o mapa.
-- Cada peça é um `MultiMeshInstance3D`; ladrilhos não projetam sombra,
+- **A cor de cada ladrilho é lida da pintura** (`travessia_terrain_v6.png`)
+  naquele ponto, com um ganho de 0,90 para compensar a luz real. Grama,
+  lanes de areia, chão de pedra das bases e rio ficam com as cores originais.
+- **Vegetação, muros e pedras nascem das camadas pintadas**: onde uma camada
+  (florestas, muralhas, margens do rio, acampamentos) é opaca, entra a peça
+  que combina com a cor pintada ali, tingida com essa cor. Verde vira árvore
+  (grade grossa) ou moita; cinza vira muro (muralhas) ou pedra; roxo vira
+  flor. Sem aleatoriedade.
+- Cada peça é um `MultiMeshInstance3D` com cor por instância
+  (`use_instance_color` no shader cel); ladrilhos não projetam sombra,
   vegetação e muros projetam.
-- Vegetação: células de grama encostadas num caminho recebem moita (62%),
-  árvore (24%) ou pedra; o interior recebe pinheiros, árvores, pedras e
-  flores esparsos (semente fixa, o mapa é sempre igual).
 - Plataformas das torres (`TowerPlatforms`, móveis pelos testes), plataformas
   dos núcleos e o poço do dragão são nós próprios.
 - `open_gates()` esconde os blocos do anel na frente dos dois portões; as
